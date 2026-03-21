@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Exam Batches{% endblock %}
+{% block page_title %}Manage Exam Batches{% endblock %}
+
+{% block content %}
+<div id="batchContent">
+  <div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+</div>
+
+<!-- Create Batch Modal -->
+<div class="modal fade" id="createModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header border-0 pb-0">
+      <h5 class="modal-title fw-bold">Create Exam Batch</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Batch Name *</label>
+          <input type="text" class="form-control" id="b_name" placeholder="e.g. Hall A — Batch 1">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Assign Invigilator *</label>
+          <select class="form-select" id="b_staff"></select>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">Select Students *</label>
+          <div class="mb-2 d-flex gap-2">
+            <input type="text" class="form-control form-control-sm" id="b_search"
+                   placeholder="Search by name or roll no…" oninput="filterStudents()">
+            <button class="btn btn-sm btn-outline-primary" onclick="selectAllStudents()">All</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearStudents()">Clear</button>
+          </div>
+          <div id="studentCheckList" style="max-height:280px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;padding:8px;"></div>
+          <div style="font-size:.78rem;color:#64748b;margin-top:4px;" id="selStudentCount">0 selected</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-primary fw-semibold" onclick="createBatch()">
+        <i class="fas fa-plus me-1"></i>Create Batch
+      </button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const EXAM_ID = {{ exam_id }};
+let examBatches=[], allStudents=[], allStaff=[], selStudents=new Set();
+const user = JSON.parse(localStorage.getItem('user')||'{}');
+
+async function load() {
+  const [bResp, sResp, stResp] = await Promise.all([
+    apiGet(`/api/exams/${EXAM_ID}/batches`),
+    apiGet('/api/users/list?role=student'),
+    apiGet('/api/users/list?role=staff'),
+  ]);
+  examBatches = bResp.ok ? await bResp.json() : [];
+  const sData = sResp.ok ? await sResp.json() : [];
+  allStudents = sData;
+  const stData = stResp.ok ? await stResp.json() : [];
+  allStaff = stData;
+  renderPage();
+  renderStudentList(allStudents);
+  renderStaffSelect();
+}
+
+function renderPage() {
+  const div = document.getElementById('batchContent');
+  div.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <p style="color:#64748b;font-size:.875rem;margin:0;">
+          ${examBatches.length} batch${examBatches.length!==1?'es':''} created
+        </p>
+      </div>
+      <button onclick="openCreateModal()" class="btn btn-primary" style="border-radius:8px;">
+        <i class="fas fa-plus me-1"></i>New Batch
+      </button>
+    </div>
+    ${!examBatches.length ? `<div class="card-custom p-5 text-center">
+      <i class="fas fa-layer-group fa-3x text-muted mb-3"></i>
+      <h5 class="text-muted">No batches yet</h5>
+      <p class="text-muted">Create batches to assign students to invigilators.</p>
+    </div>` : `<div class="row g-3">${examBatches.map(b => batchCard(b)).join('')}</div>`}`;
+}
+
+function batchCard(b) {
+  return `<div class="col-md-6 col-lg-4">
+    <div class="card-custom p-4">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 style="font-weight:700;margin:0;">${b.batch_name}</h6>
+        <span style="background:${b.exam_enabled?'#dcfce7':'#fef9c3'};color:${b.exam_enabled?'#16a34a':'#854d0e'};padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;">
+          ${b.exam_enabled?'RUNNING':b.otp_active?'OTP ACTIVE':'PENDING'}
+        </span>
+      </div>
+      <div style="font-size:.8rem;color:#64748b;margin-bottom:10px;">
+        <i class="fas fa-user-tie me-1"></i>${b.staff_name} &nbsp;·&nbsp;
+        <i class="fas fa-users me-1"></i>${b.total} students
+      </div>
+      <div class="row g-1 mb-3" style="font-size:.75rem;">
+        <div class="col-6"><span style="color:#64748b;">OTP Entered:</span> <strong>${b.otp_entered_count}</strong></div>
+        <div class="col-6"><span style="color:#64748b;">Submitted:</span> <strong>${b.submitted_count}</strong></div>
+        <div class="col-6"><span style="color:#64748b;">Present:</span> <strong>${b.present_count}</strong></div>
+        <div class="col-6" style="color:#dc2626;"><span>Malpractice:</span> <strong>${b.malpractice_count}</strong></div>
+      </div>
+      <a href="/exams/monitor/${b.id}" class="btn btn-primary btn-sm w-100" style="border-radius:8px;">
+        <i class="fas fa-desktop me-1"></i>Open Monitor
+      </a>
+    </div>
+  </div>`;
+}
+
+function renderStaffSelect() {
+  const sel = document.getElementById('b_staff');
+  // Include placement officers + all staff roles
+  const eligible = allStaff.filter(s =>
+    ['staff','senior_staff','junior_staff','placement_officer','head_admin'].includes(s.role));
+  sel.innerHTML = eligible.map(s =>
+    `<option value="${s.id}">${s.name} (${s.role})</option>`).join('');
+}
+
+function renderStudentList(students) {
+  document.getElementById('studentCheckList').innerHTML = students.map(s => `
+    <div class="d-flex align-items-center gap-2 p-2 rounded-2 mb-1" style="border:1px solid transparent;cursor:pointer;"
+         onclick="toggleStudent(${s.id},this)" id="sc-${s.id}">
+      <input type="checkbox" ${selStudents.has(s.id)?'checked':''} style="width:15px;height:15px;flex-shrink:0;">
+      <div>
+        <div style="font-size:.82rem;font-weight:500;">${s.name}</div>
+        <div style="font-size:.7rem;color:#94a3b8;">${s.roll_number||s.email} · ${s.department||'—'}</div>
+      </div>
+    </div>`).join('') || '<p class="text-muted text-center py-3" style="font-size:.82rem;">No students found</p>';
+  updateSelCount();
+}
+
+function filterStudents() {
+  const q = document.getElementById('b_search').value.toLowerCase();
+  renderStudentList(allStudents.filter(s =>
+    s.name.toLowerCase().includes(q) ||
+    (s.roll_number||'').toLowerCase().includes(q) ||
+    (s.email||'').toLowerCase().includes(q)));
+}
+
+function toggleStudent(id, el) {
+  if (selStudents.has(id)) { selStudents.delete(id); el.style.background=''; }
+  else { selStudents.add(id); el.style.background='#eff6ff'; el.style.border='1px solid #93c5fd'; }
+  el.querySelector('input').checked = selStudents.has(id);
+  updateSelCount();
+}
+
+function selectAllStudents() { allStudents.forEach(s => selStudents.add(s.id)); filterStudents(); }
+function clearStudents() { selStudents.clear(); filterStudents(); }
+function updateSelCount() {
+  document.getElementById('selStudentCount').textContent = `${selStudents.size} students selected`;
+}
+
+function openCreateModal() {
+  selStudents.clear();
+  renderStudentList(allStudents);
+  new bootstrap.Modal(document.getElementById('createModal')).show();
+}
+
+async function createBatch() {
+  const name = document.getElementById('b_name').value.trim();
+  const staffId = parseInt(document.getElementById('b_staff').value);
+  if (!name) { showToast('Batch name required','error'); return; }
+  if (!selStudents.size) { showToast('Select at least one student','error'); return; }
+  const body = {exam_id: EXAM_ID, batch_name: name, student_ids: [...selStudents]};
+  const resp = await apiPost(`/api/exams/${EXAM_ID}/batches`, body);
+  const d = await resp.json();
+  if (resp.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('createModal'))?.hide();
+    showToast(`Batch created! OTP: ${d.otp}`, 'success');
+    load();
+  } else showToast(d.detail||'Error','error');
+}
+
+document.addEventListener('DOMContentLoaded', load);
+</script>
+{% endblock %}

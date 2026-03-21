@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Exams{% endblock %}
+{% block page_title %}Online Exams{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <p style="color:#64748b;font-size:.875rem;margin:0;" id="examSubtitle">Loading…</p>
+    </div>
+    <div class="d-flex gap-2" id="staffControls" style="display:none!important;">
+        <a href="/exams/create" class="btn-primary-custom" style="text-decoration:none;font-size:.875rem;padding:9px 18px;border-radius:10px;">
+            <i class="fas fa-plus me-2"></i>Create Exam
+        </a>
+    </div>
+</div>
+
+<!-- Filter row (staff only) -->
+<div id="filterRow" class="mb-3" style="display:none;">
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary filter-btn active" onclick="filterExams('all',this)">All</button>
+        <button class="btn btn-sm btn-outline-primary filter-btn" onclick="filterExams('online',this)">Online Tests</button>
+        <button class="btn btn-sm btn-outline-warning filter-btn" onclick="filterExams('campus',this)">Campus Tests</button>
+        <button class="btn btn-sm btn-outline-success filter-btn" onclick="filterExams('active',this)">Active</button>
+        <button class="btn btn-sm btn-outline-secondary filter-btn" onclick="filterExams('draft',this)">Draft</button>
+    </div>
+</div>
+
+<div id="examGrid" class="row g-3">
+    <div class="col-12 text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allExams = [];
+
+async function loadExams() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const role = user.role || 'student';
+    const isStaff = ['head_admin','placement_officer','senior_staff','staff','junior_staff','company','company_hr_manager','company_tech_interviewer','company_recruitment_mgr','company_team_leader','company_officer'].includes(role);
+
+    document.getElementById('examSubtitle').textContent = isStaff
+        ? 'Manage and monitor all exams'
+        : 'Active online exams available to you';
+
+    if (isStaff) {
+        document.getElementById('staffControls').style.display = 'flex';
+        document.getElementById('filterRow').style.display = 'block';
+    }
+
+    try {
+        const resp = await apiGet('/api/exams/all');
+        allExams = await resp.json();
+        renderExams(allExams);
+    } catch(e) {
+        document.getElementById('examGrid').innerHTML = '<div class="col-12"><div class="alert alert-danger">Failed to load exams. Please refresh.</div></div>';
+    }
+}
+
+let currentFilter = 'all';
+function filterExams(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    let filtered = allExams;
+    if (filter === 'online') filtered = allExams.filter(e => e.exam_type === 'online');
+    else if (filter === 'campus') filtered = allExams.filter(e => e.exam_type === 'campus');
+    else if (filter !== 'all') filtered = allExams.filter(e => e.status === filter);
+    renderExams(filtered);
+}
+
+function renderExams(exams) {
+    const grid = document.getElementById('examGrid');
+    if (!exams.length) {
+        grid.innerHTML = '<div class="col-12"><div class="card-custom p-5 text-center"><i class="fas fa-inbox fa-3x text-muted mb-3"></i><p class="text-muted">No exams found.</p></div></div>';
+        return;
+    }
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isStaff = ['head_admin','placement_officer','senior_staff','staff','junior_staff'].includes(user.role);
+
+    grid.innerHTML = exams.map(e => {
+        const statusColors = {active:'#dcfce7:#16a34a',draft:'#f1f5f9:#475569',scheduled:'#dbeafe:#1d4ed8',completed:'#f3f4f6:#6b7280'};
+        const [bg, fg] = (statusColors[e.status] || '#f3f4f6:#6b7280').split(':');
+        const typeColors = {online:'#dbeafe:#1d4ed8', campus:'#fef3c7:#92400e'};
+        const [tbg, tfg] = (typeColors[e.exam_type] || '#f3f4f6:#6b7280').split(':');
+
+        return `
+        <div class="col-md-6 col-lg-4">
+            <div class="card-custom p-4" style="height:100%;display:flex;flex-direction:column;">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div style="flex:1;">
+                        <h6 style="font-weight:700;margin-bottom:6px;color:#0f172a;">${e.title}</h6>
+                        <p style="font-size:.78rem;color:#64748b;margin:0;">${e.description || 'No description'}</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <span style="background:${bg};color:${fg};padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;">${e.status}</span>
+                    <span style="background:${tbg};color:${tfg};padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;">${e.exam_type}</span>
+                    ${e.otp_required ? '<span style="background:#fef9c3;color:#854d0e;padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;">OTP</span>' : ''}
+                </div>
+                <div class="row g-2 mb-3" style="font-size:.78rem;color:#64748b;">
+                    <div class="col-4"><i class="fas fa-clock me-1"></i>${e.duration_minutes} min</div>
+                    <div class="col-4"><i class="fas fa-question me-1"></i>${e.question_count} Qs</div>
+                    <div class="col-4"><i class="fas fa-star me-1"></i>${e.total_marks} marks</div>
+                </div>
+                <div class="mt-auto d-flex gap-2">
+                    ${e.already_submitted
+                        ? '<span class="w-100 btn btn-success btn-sm disabled">✓ Submitted</span>'
+                        : e.status === 'active'
+                            ? `<a href="/exams/${e.id}" class="btn btn-primary btn-sm flex-grow-1" style="border-radius:8px;font-weight:600;">Start Exam</a>`
+                            : isStaff
+                                ? `<a href="/exams/${e.id}" class="btn btn-outline-secondary btn-sm flex-grow-1" style="border-radius:8px;">View</a>`
+                                : '<span class="text-muted" style="font-size:.78rem;">Not active</span>'
+                    }
+                    ${isStaff ? `
+                    <button onclick="activateExam(${e.id})" class="btn btn-sm ${e.status==='active'?'btn-warning':'btn-success'}" title="${e.status==='active'?'Deactivate':'Activate'}" style="border-radius:8px;">
+                        <i class="fas ${e.status==='active'?'fa-pause':'fa-play'}"></i>
+                    </button>
+                    <button onclick="deleteExam(${e.id})" class="btn btn-sm btn-danger" title="Delete" style="border-radius:8px;"><i class="fas fa-trash"></i></button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function activateExam(id) {
+    const exam = allExams.find(e => e.id === id);
+    if (!exam) return;
+    const action = exam.status === 'active' ? 'deactivate' : 'activate';
+    if (!confirm(`${action.charAt(0).toUpperCase()+action.slice(1)} this exam?`)) return;
+    const resp = await apiPost(`/api/exams/${id}/${action}`, {});
+    if (resp.ok) { showToast(`Exam ${action}d!`, 'success'); loadExams(); }
+    else { const d = await resp.json(); showToast(d.detail || 'Error', 'error'); }
+}
+
+async function deleteExam(id) {
+    if (!confirm('Delete this exam permanently?')) return;
+    const resp = await apiDelete(`/api/exams/${id}/delete`);
+    if (resp.ok) { showToast('Exam deleted', 'success'); loadExams(); }
+    else { const d = await resp.json(); showToast(d.detail || 'Error', 'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', loadExams);
+</script>
+{% endblock %}

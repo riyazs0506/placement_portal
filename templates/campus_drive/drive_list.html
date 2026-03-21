@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Campus Drives{% endblock %}
+{% block page_title %}Campus Drives{% endblock %}
+
+{% block content %}
+<div id="statsRow" class="row g-3 mb-4" style="display:none;"></div>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary filter-btn active" onclick="filterDrives('all',this)">All</button>
+        <button class="btn btn-sm btn-outline-warning filter-btn" onclick="filterDrives('pending',this)">Pending</button>
+        <button class="btn btn-sm btn-outline-success filter-btn" onclick="filterDrives('approved',this)">Approved</button>
+        <button class="btn btn-sm btn-outline-info filter-btn" onclick="filterDrives('ongoing',this)">Ongoing</button>
+        <button class="btn btn-sm filter-btn" style="border:1px solid #e2e8f0;" onclick="filterDrives('completed',this)">Completed</button>
+    </div>
+    <div id="companyBtn" style="display:none;">
+        <a href="/campus-drives/create" class="btn-primary-custom" style="text-decoration:none;font-size:.875rem;padding:9px 18px;border-radius:10px;">
+            <i class="fas fa-plus me-2"></i>New Drive
+        </a>
+    </div>
+</div>
+
+<!-- Real-time indicator -->
+<div id="realtimeBar" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 16px;font-size:.78rem;color:#166534;margin-bottom:12px;">
+    <i class="fas fa-circle me-1" style="color:#10b981;font-size:.6rem;animation:pulse 2s infinite;"></i>
+    Live updates active — page refreshes automatically when drives are updated.
+</div>
+
+<div id="driveGrid" class="row g-3">
+    <div class="col-12 text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+</div>
+
+<style>
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.filter-btn.active{background:#1e293b;color:#fff;border-color:#1e293b;}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allDrives = [];
+const COMPANY_ROLES = ['company','company_hr_manager','company_tech_interviewer','company_recruitment_mgr','company_team_leader','company_officer'];
+const STAFF_ROLES   = ['head_admin','placement_officer','senior_staff','staff','junior_staff'];
+const PSTAT = {
+    selected:   {bg:'#dcfce7',fg:'#16a34a'},
+    shortlisted:{bg:'#dbeafe',fg:'#1d4ed8'},
+    rejected:   {bg:'#fee2e2',fg:'#dc2626'},
+    on_hold:    {bg:'#fef9c3',fg:'#854d0e'},
+};
+
+async function loadDrives() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const role = user.role || 'student';
+    const isCompany = COMPANY_ROLES.includes(role);
+    const isStaff   = STAFF_ROLES.includes(role);
+
+    if (isCompany) document.getElementById('companyBtn').style.display = 'block';
+    if (isStaff || isCompany) {
+        document.getElementById('realtimeBar').style.display = 'block';
+        loadStats();
+    }
+
+    try {
+        const resp = await apiGet('/api/campus-drive/drives');
+        allDrives = await resp.json();
+        renderDrives(allDrives, role, isStaff, isCompany);
+    } catch(e) {
+        document.getElementById('driveGrid').innerHTML =
+            '<div class="col-12"><div class="alert alert-danger">Failed to load drives. Please refresh.</div></div>';
+    }
+}
+
+async function loadStats() {
+    try {
+        const resp = await apiGet('/api/campus-drive/overview/stats');
+        const s = await resp.json();
+        const row = document.getElementById('statsRow');
+        row.style.display = 'flex';
+        const cards = [
+            {label:'Total Drives',   value:s.total_drives,    color:'#2563eb', icon:'fa-building'},
+            {label:'Pending Review', value:s.pending,         color:'#f59e0b', icon:'fa-hourglass-half'},
+            {label:'Approved',       value:s.approved,        color:'#10b981', icon:'fa-check-circle'},
+            {label:'Total Selected', value:s.total_selected||0, color:'#7c3aed', icon:'fa-trophy'},
+        ];
+        row.innerHTML = cards.map(c => `<div class="col-6 col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+                <div style="width:44px;height:44px;background:${c.color}15;border-radius:12px;display:flex;align-items:center;justify-content:center;color:${c.color};font-size:1.1rem;flex-shrink:0;">
+                    <i class="fas ${c.icon}"></i></div>
+                <div><div style="font-size:1.5rem;font-weight:700;">${c.value}</div>
+                     <div style="font-size:.73rem;color:#64748b;">${c.label}</div></div>
+            </div></div>`).join('');
+    } catch(e) {}
+}
+
+function filterDrives(f, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isCompany = COMPANY_ROLES.includes(user.role);
+    const isStaff   = STAFF_ROLES.includes(user.role);
+    const filtered  = f === 'all' ? allDrives : allDrives.filter(d => d.status === f);
+    renderDrives(filtered, user.role, isStaff, isCompany);
+}
+
+function renderDrives(drives, role, isStaff, isCompany) {
+    const grid = document.getElementById('driveGrid');
+    if (!drives.length) {
+        grid.innerHTML = '<div class="col-12"><div class="card-custom p-5 text-center"><i class="fas fa-inbox fa-3x text-muted mb-3"></i><p class="text-muted">No campus drives found.</p></div></div>';
+        return;
+    }
+    const SC = {pending:'#fef9c3:#854d0e',approved:'#dcfce7:#16a34a',rescheduled:'#dbeafe:#1d4ed8',rejected:'#fee2e2:#dc2626',ongoing:'#e0e7ff:#4338ca',completed:'#f1f5f9:#475569'};
+    grid.innerHTML = drives.map(d => {
+        const [sbg,sfg] = (SC[d.status]||'#f1f5f9:#475569').split(':');
+        const elig = d.eligibility;
+        const myOpt = d.my_opt_status;
+        const pr = d.placement_result;
+
+        return `<div class="col-md-6 col-lg-4">
+        <div class="card-custom p-4" style="height:100%;display:flex;flex-direction:column;">
+            <div class="d-flex justify-content-between mb-2">
+                <span style="background:${sbg};color:${sfg};padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;">${d.status}</span>
+                <span style="font-size:.72rem;color:#64748b;">${d.opted_in_count} opted in</span>
+            </div>
+            <h6 style="font-weight:700;margin-bottom:4px;color:#0f172a;">${d.title}</h6>
+            <div style="font-size:.78rem;color:#7c3aed;font-weight:600;margin-bottom:6px;">${d.job_role}</div>
+            <div style="font-size:.78rem;color:#64748b;margin-bottom:10px;">
+                <i class="fas fa-building me-1"></i>${d.company_name}
+                ${d.package_lpa ? `<span class="ms-2"><i class="fas fa-rupee-sign me-1"></i>${d.package_lpa} LPA</span>` : ''}
+                ${d.location ? `<span class="ms-2"><i class="fas fa-map-marker-alt me-1"></i>${d.location}</span>` : ''}
+            </div>
+
+            ${elig ? `<div style="font-size:.75rem;padding:6px 10px;border-radius:8px;margin-bottom:8px;background:${elig.eligible?'#dcfce7':'#fee2e2'};color:${elig.eligible?'#16a34a':'#dc2626'};">
+                <i class="fas ${elig.eligible?'fa-check':'fa-times'} me-1"></i>${elig.eligible ? 'You are eligible' : elig.reasons[0] || 'Not eligible'}
+            </div>` : ''}
+
+            ${pr ? (() => { const psc = PSTAT[pr.status]||PSTAT.shortlisted; return `<div style="font-size:.75rem;padding:6px 10px;border-radius:8px;margin-bottom:8px;background:${psc.bg};color:${psc.fg};font-weight:600;">
+                Your Result: ${pr.status.toUpperCase()}${pr.offer_role ? ` — ${pr.offer_role}` : ''}${pr.offer_package_lpa ? ` · ${pr.offer_package_lpa} LPA` : ''}
+            </div>`; })() : ''}
+
+            ${d.confirmed_date ? `<div style="font-size:.75rem;color:#64748b;margin-bottom:8px;"><i class="fas fa-calendar me-1"></i>${new Date(d.confirmed_date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>` : ''}
+
+            <div class="mt-auto d-flex gap-2 flex-wrap">
+                <a href="/campus-drives/${d.id}" class="btn btn-sm btn-outline-primary flex-grow-1" style="border-radius:8px;font-size:.8rem;">View Details</a>
+                ${role === 'student' && d.response_open && elig?.eligible ? (
+                    myOpt === 'opted_in'
+                        ? `<button onclick="optOut(${d.id})" class="btn btn-sm btn-warning" style="border-radius:8px;font-size:.8rem;">Opt Out</button>`
+                        : `<button onclick="optIn(${d.id})" class="btn btn-sm btn-success" style="border-radius:8px;font-size:.8rem;">Opt In</button>`
+                ) : ''}
+                ${isStaff && d.status === 'pending' ? `
+                    <button onclick="quickApprove(${d.id})" class="btn btn-sm btn-success" title="Approve" style="border-radius:8px;"><i class="fas fa-check"></i></button>
+                    <button onclick="quickReject(${d.id})" class="btn btn-sm btn-danger" title="Reject" style="border-radius:8px;"><i class="fas fa-times"></i></button>` : ''}
+            </div>
+        </div></div>`;
+    }).join('');
+}
+
+async function optIn(id) {
+    const resp = await apiPost(`/api/campus-drive/drives/${id}/opt-in`, {});
+    const d = await resp.json();
+    if (resp.ok) { showToast('Opted in!', 'success'); loadDrives(); }
+    else showToast(d.detail || 'Error', 'error');
+}
+async function optOut(id) {
+    if (!confirm('Opt out from this drive?')) return;
+    const resp = await apiPost(`/api/campus-drive/drives/${id}/opt-out`, {});
+    if (resp.ok) { showToast('Opted out', 'success'); loadDrives(); }
+}
+async function quickApprove(id) {
+    const resp = await apiPost(`/api/campus-drive/drives/${id}/approve`, {});
+    if (resp.ok) { showToast('Drive approved!', 'success'); loadDrives(); }
+}
+async function quickReject(id) {
+    const notes = prompt('Reason for rejection (optional):') || '';
+    const resp = await apiPost(`/api/campus-drive/drives/${id}/reject`, {officer_notes: notes});
+    if (resp.ok) { showToast('Drive rejected', 'success'); loadDrives(); }
+}
+
+// Real-time WebSocket for drive list
+function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/ws/exam/0`);
+    ws.onmessage = e => {
+        const msg = JSON.parse(e.data);
+        if (['round_created','round_completed','results_updated','placement_result_updated'].includes(msg.type)) {
+            loadDrives();
+        }
+    };
+    ws.onclose = () => setTimeout(connectWS, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', () => { loadDrives(); connectWS(); });
+</script>
+{% endblock %}

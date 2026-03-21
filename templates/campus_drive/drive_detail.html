@@ -1,0 +1,813 @@
+{% extends "base.html" %}
+{% block title %}Drive Detail{% endblock %}
+{% block page_title %}Campus Drive Detail{% endblock %}
+
+{% block content %}
+<div id="driveContent">
+  <div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+</div>
+
+<!-- ═══ HR ROUND SELECTION MODAL ═══ -->
+<div class="modal fade" id="hrModal" tabindex="-1">
+  <div class="modal-dialog modal-xl"><div class="modal-content">
+    <div class="modal-header border-0 pb-0">
+      <div>
+        <h5 class="modal-title fw-bold" id="hrModalTitle">Select Students</h5>
+        <div style="font-size:.78rem;color:#64748b;" id="hrModalSub"></div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <!-- Bulk actions -->
+      <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+        <button onclick="bulkSelect('selected')" class="btn btn-success btn-sm" style="border-radius:7px;">✅ Select All</button>
+        <button onclick="bulkSelect('rejected')" class="btn btn-danger btn-sm"  style="border-radius:7px;">❌ Reject All</button>
+        <button onclick="bulkSelect('hold')"     class="btn btn-warning btn-sm" style="border-radius:7px;">⏸ Hold All</button>
+        <span style="font-size:.78rem;color:#64748b;margin-left:8px;" id="hrSelSummary"></span>
+        <div class="ms-auto d-flex gap-2">
+          <input type="text" id="hrSearch" class="form-control form-control-sm" placeholder="Search…" oninput="filterHrStudents()" style="width:180px;">
+          <button onclick="downloadCurrentRound()" class="btn btn-outline-secondary btn-sm" style="border-radius:7px;"><i class="fas fa-download me-1"></i>Download</button>
+        </div>
+      </div>
+      <div id="hrStudentTable" style="max-height:500px;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button onclick="saveHrSelections()" class="btn btn-primary fw-semibold" id="hrSaveBtn">
+        <i class="fas fa-save me-1"></i>Save & Notify Students
+      </button>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══ ADD ROUND MODAL ═══ -->
+<div class="modal fade" id="roundModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">Add Drive Round</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label fw-semibold">Round Number *</label><input type="number" class="form-control" id="r_num" value="1" min="1"></div>
+        <div class="col-md-8">
+          <label class="form-label fw-semibold">Round Type *</label>
+          <select class="form-select" id="r_type" onchange="toggleCustomName()">
+            <option value="aptitude">Aptitude Test</option>
+            <option value="coding">Coding Round</option>
+            <option value="group_discussion">Group Discussion</option>
+            <option value="technical">Technical Interview</option>
+            <option value="hr">HR Interview</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="col-12" id="r_custom_wrap" style="display:none;"><label class="form-label fw-semibold">Custom Name</label><input type="text" class="form-control" id="r_custom" placeholder="e.g. Psychometric Test"></div>
+        <div class="col-12"><label class="form-label fw-semibold">Description</label><textarea class="form-control" id="r_desc" rows="2"></textarea></div>
+        <div class="col-md-6"><label class="form-label fw-semibold">Passing Score (if exam-linked)</label><input type="number" class="form-control" id="r_pass" value="0" min="0"></div>
+        <div class="col-md-6"><label class="form-label fw-semibold">Link Campus Exam ID</label><input type="number" class="form-control" id="r_exam_id" placeholder="optional"></div>
+      </div>
+      <div class="mt-3 p-3 rounded-3" style="background:#eff6ff;font-size:.8rem;color:#1d4ed8;"><i class="fas fa-bell me-1"></i>All opted-in students will be notified when this round is created.</div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-primary fw-semibold" onclick="addRound()"><i class="fas fa-plus me-1"></i>Add Round</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══ PLACEMENT RESULT MODAL ═══ -->
+<div class="modal fade" id="resultModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">Set Placement Result</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="mb-3"><label class="form-label fw-semibold">Student *</label><select class="form-select" id="pr_student"></select></div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Status *</label>
+        <select class="form-select" id="pr_status" onchange="toggleOfferFields()">
+          <option value="selected">🎉 Selected — Final Offer</option>
+          <option value="shortlisted">⭐ Shortlisted</option>
+          <option value="rejected">❌ Rejected</option>
+          <option value="on_hold">⏸ On Hold</option>
+        </select>
+      </div>
+      <div id="offerFields">
+        <div class="row g-3">
+          <div class="col-md-5"><label class="form-label fw-semibold">Offer Role</label><input type="text" class="form-control" id="pr_role" placeholder="e.g. Software Engineer"></div>
+          <div class="col-md-3"><label class="form-label fw-semibold">Package (LPA)</label><input type="number" class="form-control" id="pr_pkg" step="0.1"></div>
+          <div class="col-md-4"><label class="form-label fw-semibold">Joining Date</label><input type="text" class="form-control" id="pr_joining" placeholder="1 Jul 2025"></div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label fw-semibold">Offer Letter Content <small style="color:#94a3b8;">(HTML or plain text)</small></label>
+          <textarea class="form-control" id="pr_letter" rows="6" placeholder="Dear [Name], We are pleased to offer you..."></textarea>
+          <div style="font-size:.73rem;color:#64748b;margin-top:4px;"><i class="fas fa-download me-1"></i>Student can download this as an offer letter.</div>
+        </div>
+      </div>
+      <div class="mt-3"><label class="form-label fw-semibold">Internal Notes</label><textarea class="form-control" id="pr_notes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-success fw-semibold" onclick="savePlacementResult()"><i class="fas fa-save me-1"></i>Save & Notify Student</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══ ROUND RESULTS VIEW MODAL ═══ -->
+<div class="modal fade" id="resultsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header border-0 pb-0">
+      <h5 class="modal-title fw-bold" id="resultsTitle">Round Results</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body" id="resultsBody"></div>
+  </div></div>
+</div>
+
+<!-- ═══ OFFICER ACTION MODAL ═══ -->
+<div class="modal fade" id="officerModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold" id="oModalTitle">Action</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div id="oDateWrap" class="mb-3" style="display:none;"><label class="form-label fw-semibold">Confirmed Date & Time</label><input type="datetime-local" class="form-control" id="o_date"></div>
+      <div class="mb-3"><label class="form-label fw-semibold" id="oNotesLabel">Notes / Reason</label><textarea class="form-control" id="o_notes" rows="3" placeholder="Optional…"></textarea></div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn fw-semibold" id="oBtn" onclick="submitOfficerAction()">Confirm</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══ NOTIFY MODAL ═══ -->
+<div class="modal fade" id="notifyModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">Send Notification</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="mb-3"><label class="form-label fw-semibold">Send To</label>
+        <select class="form-select" id="n_type">
+          <option value="company_to_students">→ All opted-in Students</option>
+          <option value="company_to_placement">→ Placement Officer</option>
+          <option value="system">→ Everyone</option>
+        </select>
+      </div>
+      <div class="mb-3"><label class="form-label fw-semibold">Title *</label><input type="text" class="form-control" id="n_title"></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Message *</label><textarea class="form-control" id="n_msg" rows="4"></textarea></div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-primary fw-semibold" onclick="sendNotif()"><i class="fas fa-paper-plane me-1"></i>Send</button>
+    </div>
+  </div></div>
+</div>
+
+<style>
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.rtag{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px;transition:border-color .2s;}
+.rtag:hover{border-color:#93c5fd;}
+.tbl{font-size:.8rem;}
+.tbl th{background:#f8fafc;padding:9px 12px;font-weight:600;color:#374151;font-size:.75rem;}
+.tbl td{padding:9px 12px;vertical-align:middle;}
+.sel-btn{border:none;cursor:pointer;border-radius:7px;padding:4px 10px;font-size:.73rem;font-weight:600;transition:all .15s;}
+.sel-btn:hover{transform:scale(1.05);}
+.badge-sel{background:#dcfce7;color:#16a34a;}
+.badge-rej{background:#fee2e2;color:#dc2626;}
+.badge-hold{background:#fef9c3;color:#854d0e;}
+.badge-none{background:#f1f5f9;color:#64748b;}
+.drive-type-badge{padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const DRIVE_ID = {{ drive_id }};
+let driveData = null, officerAction = null;
+let hrStudents = [], hrRoundId = null, hrRoundNum = null;
+let hrSelections = {};   // {student_id: {status, notes}}
+
+const user    = JSON.parse(localStorage.getItem('user') || '{}');
+const role    = user.role || 'student';
+const userId  = user.id || 0;
+const isStaff   = ['head_admin','placement_officer','senior_staff','staff','junior_staff'].includes(role);
+const isOfficer = ['head_admin','placement_officer'].includes(role);
+const isCompany = role.startsWith('company') || role === 'company';
+const isStudent = role === 'student';
+const canManage = isOfficer || isCompany;
+
+const STATUS_COLORS = {
+  pending:'#fef9c3:#854d0e', approved:'#dcfce7:#16a34a',
+  rescheduled:'#dbeafe:#1d4ed8', rejected:'#fee2e2:#dc2626',
+  ongoing:'#e0e7ff:#4338ca', completed:'#f1f5f9:#475569'
+};
+const ROUND_ICONS = {
+  aptitude:'fa-brain', coding:'fa-code', group_discussion:'fa-users',
+  technical:'fa-laptop-code', hr:'fa-user-tie', custom:'fa-star'
+};
+const PSTAT = {
+  selected:   {bg:'#dcfce7',fg:'#16a34a',icon:'fa-check-circle',label:'Selected'},
+  shortlisted:{bg:'#dbeafe',fg:'#1d4ed8',icon:'fa-star',label:'Shortlisted'},
+  rejected:   {bg:'#fee2e2',fg:'#dc2626',icon:'fa-times-circle',label:'Rejected'},
+  on_hold:    {bg:'#fef9c3',fg:'#854d0e',icon:'fa-pause-circle',label:'On Hold'},
+};
+const DRIVE_TYPE_META = {
+  recruitment:{label:'Recruitment',bg:'#dbeafe',fg:'#1d4ed8'},
+  internship: {label:'Internship', bg:'#fef3c7',fg:'#92400e'},
+  both:       {label:'Internship + Recruitment',bg:'#f3e8ff',fg:'#7c3aed'},
+};
+
+// ─── WebSocket ────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol==='https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/drive/${DRIVE_ID}`);
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    const refresh = ['round_created','round_completed','results_updated','placement_result',
+                     'drive_approved','drive_updated','optin_update','response_toggled'];
+    if (!msg.drive_id || msg.drive_id==DRIVE_ID) {
+      if (refresh.includes(msg.type)) { showToast('Drive updated — refreshing…','info'); setTimeout(loadDrive,600); }
+    }
+  };
+  ws.onclose = () => setTimeout(connectWS, 3000);
+}
+
+// ─── Load ─────────────────────────────────────────────────────
+async function loadDrive() {
+  const r = await apiGet(`/api/campus-drive/drives/${DRIVE_ID}`);
+  if (!r.ok) { document.getElementById('driveContent').innerHTML='<div class="alert alert-danger m-4">Drive not found. <a href="/campus-drives">Back</a></div>'; return; }
+  driveData = await r.json();
+  renderDrive();
+}
+
+function renderDrive() {
+  const d = driveData;
+  const [sbg,sfg] = (STATUS_COLORS[d.status]||'#f1f5f9:#475569').split(':');
+  const dtm = DRIVE_TYPE_META[d.drive_type] || DRIVE_TYPE_META.recruitment;
+
+  document.getElementById('driveContent').innerHTML = `
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <!-- Header card -->
+      <div class="card-custom p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div style="flex:1;min-width:0;">
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+              <span class="drive-type-badge" style="background:${dtm.bg};color:${dtm.fg};">${dtm.label}</span>
+              <span style="background:${sbg};color:${sfg};padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;">${d.status.toUpperCase()}</span>
+            </div>
+            <h4 style="font-weight:700;margin-bottom:3px;">${esc(d.title)}</h4>
+            <div style="font-size:.9rem;color:#7c3aed;font-weight:600;">${esc(d.job_role)}</div>
+            <div style="font-size:.8rem;color:#64748b;margin-top:4px;display:flex;flex-wrap:wrap;gap:12px;">
+              <span><i class="fas fa-building me-1"></i>${esc(d.company_name||'')}</span>
+              ${d.package_lpa?`<span><i class="fas fa-rupee-sign me-1"></i>${d.package_lpa} LPA</span>`:''}
+              ${d.stipend_amount?`<span><i class="fas fa-money-bill me-1"></i>₹${d.stipend_amount}/mo</span>`:''}
+              ${d.internship_duration?`<span><i class="fas fa-clock me-1"></i>${esc(d.internship_duration)}</span>`:''}
+              ${d.location?`<span><i class="fas fa-map-marker-alt me-1"></i>${esc(d.location)}</span>`:''}
+            </div>
+          </div>
+        </div>
+
+        ${d.job_description?`<p style="font-size:.875rem;color:#475569;line-height:1.7;margin-bottom:14px;white-space:pre-line;">${esc(d.job_description)}</p>`:''}
+
+        <!-- Eligibility + visit info -->
+        <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:.72rem;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Eligibility</div>
+          <div class="row g-1" style="font-size:.8rem;">
+            ${d.eligible_departments?.length?`<div class="col-md-6"><span style="color:#64748b;">Departments:</span> <strong>${d.eligible_departments.join(', ')}</strong></div>`:''}
+            ${d.eligible_batches?.length?`<div class="col-md-6"><span style="color:#64748b;">Batches:</span> <strong>${d.eligible_batches.join(', ')}</strong></div>`:''}
+            ${d.min_cgpa?`<div class="col-md-3"><span style="color:#64748b;">Min CGPA:</span> <strong>${d.min_cgpa}</strong></div>`:''}
+            ${d.min_tenth_percent?`<div class="col-md-3"><span style="color:#64748b;">10th:</span> <strong>${d.min_tenth_percent}%</strong></div>`:''}
+            ${d.min_twelfth_percent?`<div class="col-md-3"><span style="color:#64748b;">12th:</span> <strong>${d.min_twelfth_percent}%</strong></div>`:''}
+            <div class="col-md-3"><span style="color:#64748b;">Max Backlogs:</span> <strong>${d.max_backlogs}</strong></div>
+          </div>
+        </div>
+
+        <div class="row g-1" style="font-size:.82rem;">
+          ${d.requested_date?`<div class="col-md-6"><i class="fas fa-calendar-alt me-1 text-warning"></i><span style="color:#64748b;">Requested:</span> ${fmtDate(d.requested_date)}</div>`:''}
+          ${d.confirmed_date?`<div class="col-md-6"><i class="fas fa-calendar-check me-1 text-success"></i><span style="color:#64748b;">Confirmed:</span> ${fmtDate(d.confirmed_date)}</div>`:''}
+          ${d.venue?`<div class="col-md-6"><i class="fas fa-map-marker-alt me-1 text-primary"></i><span style="color:#64748b;">Venue:</span> ${esc(d.venue)}</div>`:''}
+          ${d.officer_notes?`<div class="col-12 mt-1" style="background:#fffbeb;border-radius:8px;padding:8px 12px;color:#92400e;font-size:.78rem;"><i class="fas fa-sticky-note me-1"></i>${esc(d.officer_notes)}</div>`:''}
+        </div>
+
+        ${isStudent ? renderStudentSection(d) : ''}
+      </div>
+
+      <!-- Planned rounds preview (if no actual rounds yet) -->
+      ${d.planned_rounds?.length && !d.rounds?.length ? `
+      <div class="card-custom p-4 mb-3" style="border:1px dashed #e2e8f0;">
+        <h6 style="font-weight:700;margin-bottom:10px;color:#64748b;"><i class="fas fa-road me-2"></i>Planned Round Sequence</h6>
+        <div class="d-flex flex-wrap gap-2">
+          ${d.planned_rounds.map((rt,i)=>`<span style="background:#eff6ff;color:#2563eb;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;">
+            ${i+1}. ${roundLabel(rt)}</span>`).join('<span style="color:#94a3b8;align-self:center;">→</span>')}
+        </div>
+      </div>` : ''}
+
+      <!-- Drive Rounds -->
+      <div class="card-custom p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 style="font-weight:700;margin:0;">Drive Rounds <span style="font-size:.8rem;color:#64748b;font-weight:400;">(${d.rounds.length})</span></h5>
+          ${(isCompany||isStaff)&&!d.response_open ? `
+            <button onclick="openRoundModal()" class="btn btn-primary btn-sm" style="border-radius:8px;">
+              <i class="fas fa-plus me-1"></i>Add Round
+            </button>` : (d.response_open&&(isCompany||isStaff)?`<span style="font-size:.75rem;color:#f59e0b;"><i class="fas fa-info-circle me-1"></i>Close response first</span>`:'')}
+        </div>
+        ${d.rounds.length
+          ? d.rounds.map(r=>renderRound(r)).join('')
+          : `<div class="text-center py-4" style="color:#94a3b8;"><i class="fas fa-list-ol fa-2x mb-2 d-block"></i><small>No rounds yet. Close response window to add rounds.</small></div>`}
+      </div>
+
+      <!-- Students table (staff/company) -->
+      ${(isStaff||isCompany)?`
+      <div class="card-custom p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 style="font-weight:700;margin:0;">Opted-in Students <span style="font-size:.8rem;color:#64748b;font-weight:400;">(${d.opted_in_count})</span></h5>
+          <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" id="optFilter" onchange="loadStudents(this.value)" style="width:130px;">
+              <option value="opted_in">Opted In</option>
+              <option value="opted_out">Opted Out</option>
+              <option value="">All</option>
+            </select>
+            <button onclick="apiDownload(`/api/campus-drive/drives/${DRIVE_ID}/opted-students/download`,this)" class="btn btn-outline-success btn-sm" style="border-radius:7px;" title="Download opted-in students CSV"><i class="fas fa-download me-1"></i>CSV</button>
+          </div>
+        </div>
+        <div id="studentsTable"><div class="text-center py-3"><i class="fas fa-spinner fa-spin text-muted"></i></div></div>
+      </div>`:``}
+
+      <!-- Placement Results -->
+      ${canManage?`
+      <div class="card-custom p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 style="font-weight:700;margin:0;">Final Placement Results</h5>
+          <button onclick="openResultModal()" class="btn btn-success btn-sm" style="border-radius:8px;">
+            <i class="fas fa-trophy me-1"></i>Set Result
+          </button>
+        </div>
+        <div id="placementResultsTable"><p class="text-muted" style="font-size:.83rem;">No results set yet.</p></div>
+      </div>`:``}
+    </div>
+
+    <!-- Right sidebar -->
+    <div class="col-lg-4">
+      <div class="card-custom p-4 mb-3">
+        <h6 style="font-weight:700;margin-bottom:12px;">Actions</h6>
+        <div class="d-flex flex-column gap-2">
+          ${isOfficer&&d.status==='pending'?`
+            <button onclick="showOfficerModal('approve')" class="btn btn-success btn-sm" style="border-radius:8px;"><i class="fas fa-check me-1"></i>Approve Drive</button>
+            <button onclick="showOfficerModal('reschedule')" class="btn btn-warning btn-sm" style="border-radius:8px;"><i class="fas fa-calendar-alt me-1"></i>Reschedule</button>
+            <button onclick="showOfficerModal('reject')" class="btn btn-danger btn-sm" style="border-radius:8px;"><i class="fas fa-times me-1"></i>Reject</button>`:``}
+          ${isOfficer&&d.status==='rescheduled'?`
+            <button onclick="showOfficerModal('approve')" class="btn btn-success btn-sm" style="border-radius:8px;"><i class="fas fa-check me-1"></i>Approve</button>`:``}
+          ${(isOfficer||isCompany)?`
+            <button onclick="toggleResponse()" class="btn btn-sm ${d.response_open?'btn-outline-warning':'btn-outline-success'}" style="border-radius:8px;">
+              <i class="fas ${d.response_open?'fa-lock':'fa-lock-open'} me-1"></i>${d.response_open?'Close Response':'Open Response'}
+            </button>`:``}
+          ${(isCompany||isStaff)?`
+            <button class="btn btn-outline-primary btn-sm" style="border-radius:8px;" data-bs-toggle="modal" data-bs-target="#notifyModal">
+              <i class="fas fa-bell me-1"></i>Send Notification
+            </button>`:``}
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="card-custom p-4 mb-3">
+        <h6 style="font-weight:700;margin-bottom:12px;">Summary</h6>
+        <div style="font-size:.83rem;">
+          <div class="d-flex justify-content-between py-2 border-bottom"><span style="color:#64748b;">Total Opted In</span><strong>${d.opted_in_count}</strong></div>
+          <div class="d-flex justify-content-between py-2 border-bottom"><span style="color:#64748b;">Rounds</span><strong>${d.rounds.length}</strong></div>
+          ${d.planned_rounds?.length?`<div class="d-flex justify-content-between py-2 border-bottom"><span style="color:#64748b;">Planned</span><strong>${d.planned_rounds.length} rounds</strong></div>`:''}
+          <div class="d-flex justify-content-between py-2 border-bottom"><span style="color:#64748b;">Response</span>
+            <strong style="color:${d.response_open?'#10b981':'#ef4444'};">${d.response_open?'Open':'Closed'}</strong></div>
+          <div class="d-flex justify-content-between py-2"><span style="color:#64748b;">Status</span>
+            <span style="background:${sbg};color:${sfg};padding:1px 8px;border-radius:10px;font-size:.72rem;font-weight:600;">${d.status}</span></div>
+        </div>
+      </div>
+
+      <!-- Live indicator -->
+      <div class="card-custom p-3" style="border:1px solid #dcfce7;background:#f0fdf4;">
+        <div class="d-flex align-items-center gap-2" style="font-size:.8rem;">
+          <div style="width:8px;height:8px;background:#10b981;border-radius:50%;animation:pulse 2s infinite;flex-shrink:0;"></div>
+          <span style="color:#166534;font-weight:500;">Live updates active</span>
+        </div>
+        <div style="font-size:.72rem;color:#64748b;margin-top:3px;">Auto-refreshes on round or result changes.</div>
+      </div>
+    </div>
+  </div>`;
+
+  if (isStaff||isCompany) { loadStudents('opted_in'); loadPlacementResults(); }
+}
+
+function renderStudentSection(d) {
+  const el = d.eligibility||{};
+  const pr = d.placement_result;
+  let html = '';
+
+  if (el.eligible!==undefined) {
+    html += `<div style="margin-top:14px;padding:10px 14px;border-radius:10px;background:${el.eligible?'#dcfce7':'#fee2e2'};color:${el.eligible?'#16a34a':'#dc2626'};font-size:.83rem;font-weight:600;">
+      <i class="fas ${el.eligible?'fa-check-circle':'fa-times-circle'} me-1"></i>
+      ${el.eligible?'You are eligible for this drive':(el.reasons||[]).join(' · ')}
+    </div>`;
+  }
+
+  if (pr) {
+    const p = PSTAT[pr.status]||PSTAT.shortlisted;
+    html += `<div style="margin-top:10px;padding:14px;border-radius:12px;background:${p.bg};border:1px solid ${p.fg}40;">
+      <div style="font-weight:700;color:${p.fg};"><i class="fas ${p.icon} me-1"></i>${p.label.toUpperCase()}</div>
+      ${pr.offer_role?`<div style="font-size:.82rem;margin-top:4px;">Role: <strong>${esc(pr.offer_role)}</strong></div>`:''}
+      ${pr.offer_package_lpa?`<div style="font-size:.82rem;">Package: <strong>${pr.offer_package_lpa} LPA</strong></div>`:''}
+      ${pr.joining_date?`<div style="font-size:.82rem;">Joining: <strong>${esc(pr.joining_date)}</strong></div>`:''}
+      ${pr.has_offer_letter?`<button onclick="apiDownload('/api/campus-drive/drives/${DRIVE_ID}/offer-letter/${userId}',this)" class="btn btn-sm mt-2" style="background:${p.fg};color:#fff;border-radius:7px;font-size:.78rem;border:none;cursor:pointer;"><i class="fas fa-download me-1"></i>Download Offer Letter</button>`:''}
+    </div>`;
+  }
+
+  if (d.response_open && el.eligible && !pr) {
+    html += `<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+      ${d.my_opt_status==='opted_in'
+        ?`<button onclick="optOut()" class="btn btn-warning btn-sm" style="border-radius:8px;"><i class="fas fa-minus me-1"></i>Opt Out</button>
+           <span style="font-size:.78rem;color:#10b981;font-weight:600;"><i class="fas fa-check-circle me-1"></i>Opted In</span>`
+        :`<button onclick="optIn()" class="btn btn-success btn-sm" style="border-radius:8px;"><i class="fas fa-plus me-1"></i>Opt In</button>`}
+    </div>`;
+  } else if (!d.response_open && !pr && d.my_opt_status==='opted_in') {
+    html += `<div style="margin-top:10px;font-size:.78rem;color:#64748b;padding:8px 12px;background:#f1f5f9;border-radius:8px;">
+      <i class="fas fa-lock me-1"></i>Response closed. Await company updates.
+    </div>`;
+  }
+  return html;
+}
+
+function renderRound(r) {
+  const lbl = {aptitude:'Aptitude',coding:'Coding',group_discussion:'Group Discussion',technical:'Technical Interview',hr:'HR Interview',custom:r.custom_name||'Custom'};
+  const sc = {pending:'#fef9c3:#854d0e',active:'#dcfce7:#16a34a',completed:'#f1f5f9:#475569'};
+  const [rbg,rfg] = (sc[r.status]||'#f1f5f9:#475569').split(':');
+  return `<div class="rtag">
+    <div class="d-flex justify-content-between align-items-start">
+      <div class="d-flex align-items-start gap-2">
+        <div style="width:34px;height:34px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#2563eb;font-size:.85rem;flex-shrink:0;">
+          <i class="fas ${ROUND_ICONS[r.round_type]||'fa-list'}"></i>
+        </div>
+        <div>
+          <div style="font-weight:600;font-size:.88rem;">Round ${r.round_number}: ${lbl[r.round_type]}</div>
+          ${r.description?`<div style="font-size:.73rem;color:#64748b;">${esc(r.description)}</div>`:''}
+          <div style="font-size:.75rem;color:#64748b;margin-top:4px;display:flex;flex-wrap:wrap;gap:10px;">
+            <span style="color:#10b981;">✅ ${r.passed_count} passed</span>
+            <span style="color:#ef4444;">❌ ${r.failed_count} failed</span>
+            <span style="color:#64748b;">Total: ${r.total_results}</span>
+          </div>
+        </div>
+      </div>
+      <span style="background:${rbg};color:${rfg};padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:700;flex-shrink:0;">${r.status.toUpperCase()}</span>
+    </div>
+    ${(isCompany||isStaff)?`<div class="d-flex gap-2 mt-2 flex-wrap">
+      ${r.status!=='completed'?`
+        <button onclick="completeRound(${r.id})" class="btn btn-sm btn-success" style="border-radius:6px;font-size:.75rem;padding:4px 10px;">
+          <i class="fas fa-check me-1"></i>Complete Round
+        </button>`:`<span style="font-size:.72rem;color:#475569;align-self:center;"><i class="fas fa-check-double me-1"></i>Completed</span>`}
+      <button onclick="openHrModal(${r.id},${r.round_number},'${lbl[r.round_type]}')" class="btn btn-sm btn-primary" style="border-radius:6px;font-size:.75rem;padding:4px 10px;">
+        <i class="fas fa-hand-pointer me-1"></i>Select Students
+      </button>
+      <button onclick="viewResults(${r.id},'Round ${r.round_number}')" class="btn btn-sm btn-outline-secondary" style="border-radius:6px;font-size:.75rem;padding:4px 10px;">
+        <i class="fas fa-list me-1"></i>View Results
+      </button>
+      <button onclick="apiDownload(`/api/campus-drive/drives/${DRIVE_ID}/rounds/${r.id}/shortlist/download?status=selected`,this)" class="btn btn-sm btn-outline-success" style="border-radius:6px;font-size:.75rem;padding:4px 10px;"><i class="fas fa-download me-1"></i>Selected CSV</button>
+      <button onclick="apiDownload(`/api/campus-drive/drives/${DRIVE_ID}/rounds/${r.id}/shortlist/download?status=rejected`,this)" class="btn btn-sm btn-outline-danger" style="border-radius:6px;font-size:.75rem;padding:4px 10px;"><i class="fas fa-download me-1"></i>Rejected CSV</button>
+      <button onclick="deleteRound(${r.id})" class="btn btn-sm btn-outline-danger" style="border-radius:6px;font-size:.75rem;padding:4px 10px;"><i class="fas fa-trash"></i></button>
+    </div>`:``}
+  </div>`;
+}
+
+// ─── HR SELECTION MODAL ─────────────────────────────────────
+async function openHrModal(roundId, roundNum, roundName) {
+  hrRoundId = roundId; hrRoundNum = roundNum;
+  document.getElementById('hrModalTitle').textContent = `Select Students — Round ${roundNum}: ${roundName}`;
+  document.getElementById('hrModalSub').textContent = 'Click a status button to select / reject / hold each student. Press Save when done.';
+  document.getElementById('hrStudentTable').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>';
+  new bootstrap.Modal(document.getElementById('hrModal')).show();
+
+  const resp = await apiGet(`/api/campus-drive/rounds/${roundId}/students`);
+  const data = await resp.json();
+  hrStudents = data.students || [];
+
+  // Pre-populate selections from existing HR data
+  hrSelections = {};
+  hrStudents.forEach(s => {
+    if (s.hr_status) hrSelections[s.student_id] = {status: s.hr_status, notes: s.hr_notes || ''};
+  });
+
+  renderHrTable();
+}
+
+function renderHrTable(filter='') {
+  const filtered = filter ? hrStudents.filter(s =>
+    s.name.toLowerCase().includes(filter) ||
+    (s.roll_number||'').toLowerCase().includes(filter) ||
+    (s.department||'').toLowerCase().includes(filter)) : hrStudents;
+
+  if (!filtered.length) {
+    document.getElementById('hrStudentTable').innerHTML =
+      '<p class="text-muted text-center py-4">No students found.</p>';
+    return;
+  }
+
+  document.getElementById('hrStudentTable').innerHTML = `
+    <table class="table tbl table-hover" style="min-width:700px;">
+      <thead><tr>
+        <th style="padding:9px 12px;">#</th>
+        <th>Name / Roll No</th>
+        <th>Dept · Batch</th>
+        <th>CGPA</th>
+        <th>Exam Score</th>
+        <th>HR Decision</th>
+        <th>Notes</th>
+      </tr></thead>
+      <tbody>
+        ${filtered.map((s,i) => {
+          const cur = hrSelections[s.student_id];
+          const st  = cur?.status || null;
+          return `<tr id="hr-row-${s.student_id}">
+            <td style="color:#94a3b8;font-size:.75rem;">${i+1}</td>
+            <td>
+              <div style="font-weight:600;">${esc(s.name)}</div>
+              <div style="font-size:.72rem;color:#94a3b8;">${s.roll_number||s.email}</div>
+            </td>
+            <td style="font-size:.78rem;">${s.department||'—'} · ${s.batch_year||''}</td>
+            <td style="font-size:.82rem;">${s.cgpa||'—'}</td>
+            <td style="font-size:.82rem;">
+              ${s.exam_score!=null?`<span style="font-weight:600;color:${s.exam_passed?'#16a34a':'#dc2626'};">${s.exam_score} ${s.exam_passed?'✅':'❌'}</span>`:'—'}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="sel-btn ${st==='selected'?'badge-sel':''}" onclick="setStatus(${s.student_id},'selected')" title="Select">✅ Select</button>
+                <button class="sel-btn ${st==='rejected'?'badge-rej':''}" onclick="setStatus(${s.student_id},'rejected')" title="Reject">❌ Reject</button>
+                <button class="sel-btn ${st==='hold'?'badge-hold':''}" onclick="setStatus(${s.student_id},'hold')" title="On Hold">⏸ Hold</button>
+              </div>
+            </td>
+            <td>
+              <input type="text" placeholder="Notes…" value="${esc(cur?.notes||'')}"
+                style="border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;font-size:.75rem;width:120px;"
+                oninput="setNotes(${s.student_id},this.value)">
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  updateHrSummary();
+}
+
+function setStatus(sid, status) {
+  if (!hrSelections[sid]) hrSelections[sid] = {status:'', notes:''};
+  hrSelections[sid].status = status;
+  renderHrTable(document.getElementById('hrSearch').value.toLowerCase());
+}
+
+function setNotes(sid, notes) {
+  if (!hrSelections[sid]) hrSelections[sid] = {status:'', notes:''};
+  hrSelections[sid].notes = notes;
+}
+
+function bulkSelect(status) {
+  hrStudents.forEach(s => {
+    hrSelections[s.student_id] = {status, notes: hrSelections[s.student_id]?.notes||''};
+  });
+  renderHrTable(document.getElementById('hrSearch').value.toLowerCase());
+}
+
+function filterHrStudents() {
+  renderHrTable(document.getElementById('hrSearch').value.toLowerCase());
+}
+
+function updateHrSummary() {
+  const sel  = Object.values(hrSelections).filter(x=>x.status==='selected').length;
+  const rej  = Object.values(hrSelections).filter(x=>x.status==='rejected').length;
+  const hold = Object.values(hrSelections).filter(x=>x.status==='hold').length;
+  const none = hrStudents.length - sel - rej - hold;
+  document.getElementById('hrSelSummary').textContent =
+    `✅ ${sel} selected · ❌ ${rej} rejected · ⏸ ${hold} hold · ${none} pending`;
+}
+
+function downloadCurrentRound() {
+  if (!hrRoundId) return;
+  apiDownload(`/api/campus-drive/drives/${DRIVE_ID}/rounds/${hrRoundId}/shortlist/download?status=selected`, document.getElementById('hrDownloadBtn'));
+}
+
+async function saveHrSelections() {
+  const btn = document.getElementById('hrSaveBtn');
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i>Saving…';
+
+  const selections = Object.entries(hrSelections)
+    .filter(([,v])=>v.status)
+    .map(([sid,v])=>({student_id:parseInt(sid), status:v.status, notes:v.notes}));
+
+  if (!selections.length) { showToast('No selections made yet.','warning'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>Save & Notify Students'; return; }
+
+  const resp = await apiPost(`/api/campus-drive/rounds/${hrRoundId}/select-students`, {selections});
+  const d = await resp.json();
+  if (resp.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('hrModal'))?.hide();
+    showToast(d.message,'success');
+    loadDrive();
+  } else showToast(d.detail||'Error','error');
+  btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>Save & Notify Students';
+}
+
+// ─── Students table ────────────────────────────────────────
+async function loadStudents(filter) {
+  const div = document.getElementById('studentsTable');
+  if (!div) return;
+  div.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-muted"></i></div>';
+  const r = await apiGet(`/api/campus-drive/drives/${DRIVE_ID}/opted-students?filter_status=${filter}`);
+  const data = await r.json();
+  const students = data.students || [];
+  if (!students.length) { div.innerHTML='<p class="text-muted text-center py-3" style="font-size:.83rem;">No students found.</p>'; return; }
+  div.innerHTML = `<div style="overflow-x:auto;"><table class="table tbl table-hover">
+    <thead><tr><th style="padding:9px 12px;">Name</th><th>Roll / Dept</th><th>CGPA</th><th>Status</th><th>Latest Round</th><th>Result</th></tr></thead>
+    <tbody>${students.map(s=>{
+      const pr = s.placement_status?PSTAT[s.placement_status]:null;
+      return `<tr>
+        <td style="padding:9px 12px;"><div style="font-weight:500;">${esc(s.name)}</div><div style="font-size:.7rem;color:#94a3b8;">${esc(s.email)}</div></td>
+        <td style="font-size:.78rem;">${s.roll_number||'—'}<br><span style="color:#64748b;">${s.department||''} ${s.batch_year||''}</span></td>
+        <td style="font-size:.82rem;">${s.cgpa||'—'}</td>
+        <td><span style="background:${s.opt_status==='opted_in'?'#dcfce7':'#fee2e2'};color:${s.opt_status==='opted_in'?'#16a34a':'#dc2626'};padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:600;">${s.opt_status}</span></td>
+        <td style="font-size:.78rem;">${s.latest_round?`R${s.latest_round.round_number}: <span style="color:${s.latest_round.passed?'#16a34a':'#dc2626'};font-weight:600;">${s.latest_round.passed?'Pass':'Fail'}</span>`:'—'}</td>
+        <td>${pr?`<span style="background:${pr.bg};color:${pr.fg};padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:600;">${pr.label}</span>`:'—'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+async function loadPlacementResults() {
+  const div = document.getElementById('placementResultsTable');
+  if (!div) return;
+  const r = await apiGet(`/api/campus-drive/drives/${DRIVE_ID}/placement-results`);
+  if (!r.ok) return;
+  const results = await r.json();
+  if (!results.length) { div.innerHTML='<p class="text-muted" style="font-size:.83rem;">No final results set yet.</p>'; return; }
+  div.innerHTML = `<div style="overflow-x:auto;"><table class="table tbl table-hover">
+    <thead><tr><th style="padding:9px 12px;">Student</th><th>Status</th><th>Role</th><th>Package</th><th>Joining</th><th>Offer</th></tr></thead>
+    <tbody>${results.map(r=>{
+      const p=PSTAT[r.status]||PSTAT.shortlisted;
+      return `<tr>
+        <td style="padding:9px 12px;"><div style="font-weight:500;">${esc(r.name)}</div><div style="font-size:.72rem;color:#94a3b8;">${r.roll_number||r.email}</div></td>
+        <td><span style="background:${p.bg};color:${p.fg};padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:600;">${p.label}</span></td>
+        <td style="font-size:.8rem;">${r.offer_role||'—'}</td>
+        <td style="font-size:.8rem;">${r.offer_package_lpa?r.offer_package_lpa+' LPA':'—'}</td>
+        <td style="font-size:.8rem;">${r.joining_date||'—'}</td>
+        <td>${r.has_offer_letter?`<button onclick="apiDownload(\`/api/campus-drive/drives/${DRIVE_ID}/offer-letter/${r.student_id}\`,this)" class="btn btn-xs btn-success" style="font-size:.72rem;padding:2px 8px;border-radius:6px;border:none;cursor:pointer;"><i class="fas fa-download me-1"></i>Letter</button>`:'—'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+async function viewResults(rid, title) {
+  document.getElementById('resultsTitle').textContent = title;
+  document.getElementById('resultsBody').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>';
+  new bootstrap.Modal(document.getElementById('resultsModal')).show();
+  const r = await apiGet(`/api/campus-drive/rounds/${rid}/results`);
+  const results = await r.json();
+  if (!results.length) { document.getElementById('resultsBody').innerHTML='<p class="text-muted text-center py-4">No results yet.</p>'; return; }
+  const passed = results.filter(x=>x.passed).length;
+  document.getElementById('resultsBody').innerHTML = `
+    <div class="d-flex gap-3 mb-3">
+      ${[{n:passed,c:'#dcfce7',fc:'#16a34a',l:'Passed'},{n:results.length-passed,c:'#fee2e2',fc:'#dc2626',l:'Failed'},{n:results.length,c:'#f1f5f9',fc:'#475569',l:'Total'}].map(x=>
+        `<div style="background:${x.c};border-radius:10px;padding:10px 18px;text-align:center;">
+          <div style="font-size:1.4rem;font-weight:700;color:${x.fc};">${x.n}</div>
+          <div style="font-size:.72rem;color:${x.fc};">${x.l}</div>
+        </div>`).join('')}
+    </div>
+    <table class="table tbl table-hover">
+      <thead><tr><th style="padding:9px 12px;">Student</th><th>Dept</th><th>Score</th><th>Result</th><th>Notes</th></tr></thead>
+      <tbody>${results.map(r=>`<tr>
+        <td style="padding:9px 12px;"><div style="font-weight:500;">${esc(r.name)}</div><div style="font-size:.7rem;color:#94a3b8;">${r.roll_number||r.email}</div></td>
+        <td style="font-size:.78rem;">${r.department||'—'}</td>
+        <td style="font-size:.82rem;">${r.score!=null?r.score:'—'}</td>
+        <td><span style="background:${r.passed?'#dcfce7':'#fee2e2'};color:${r.passed?'#16a34a':'#dc2626'};padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:600;">${r.passed?'PASS':'FAIL'}</span></td>
+        <td style="font-size:.75rem;color:#64748b;">${r.notes||'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+// ─── Round Modal ───────────────────────────────────────────
+function openRoundModal() {
+  document.getElementById('r_num').value = (driveData?.rounds?.length||0)+1;
+  new bootstrap.Modal(document.getElementById('roundModal')).show();
+}
+function toggleCustomName() {
+  document.getElementById('r_custom_wrap').style.display = document.getElementById('r_type').value==='custom'?'block':'none';
+}
+async function addRound() {
+  const body = {
+    round_number: parseInt(document.getElementById('r_num').value),
+    round_type: document.getElementById('r_type').value,
+    custom_name: document.getElementById('r_custom').value||null,
+    description: document.getElementById('r_desc').value||null,
+    passing_score: parseInt(document.getElementById('r_pass').value)||0,
+    exam_id: parseInt(document.getElementById('r_exam_id').value)||null,
+  };
+  const r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/rounds`, body);
+  const d = await r.json();
+  if (r.ok) { bootstrap.Modal.getInstance(document.getElementById('roundModal'))?.hide(); showToast('Round added!','success'); loadDrive(); }
+  else showToast(d.detail||'Error','error');
+}
+async function completeRound(rid) {
+  if (!confirm('Complete this round? Pass/fail auto-calculated from exam scores.')) return;
+  const r = await apiPost(`/api/campus-drive/rounds/${rid}/complete`,{});
+  const d = await r.json();
+  if (r.ok) { showToast(d.message,'success'); loadDrive(); }
+  else showToast(d.detail||'Error','error');
+}
+async function deleteRound(rid) {
+  if (!confirm('Delete this round and all its results?')) return;
+  const r = await apiDelete(`/api/campus-drive/rounds/${rid}`);
+  if (r.ok) { showToast('Round deleted','success'); loadDrive(); }
+}
+
+// ─── Placement Result ──────────────────────────────────────
+function toggleOfferFields() {
+  document.getElementById('offerFields').style.display = document.getElementById('pr_status').value==='selected'?'block':'none';
+}
+async function openResultModal() {
+  const r = await apiGet(`/api/campus-drive/drives/${DRIVE_ID}/opted-students?filter_status=opted_in`);
+  const d = await r.json();
+  document.getElementById('pr_student').innerHTML = (d.students||[]).map(s=>
+    `<option value="${s.student_id}">${esc(s.name)} (${s.roll_number||s.email}) — ${s.department}</option>`
+  ).join('')||'<option>No opted-in students</option>';
+  ['pr_role','pr_joining','pr_letter','pr_notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pr_pkg').value='';
+  toggleOfferFields();
+  new bootstrap.Modal(document.getElementById('resultModal')).show();
+}
+async function savePlacementResult() {
+  const sid = parseInt(document.getElementById('pr_student').value);
+  if (!sid) { showToast('Select a student','error'); return; }
+  const body = {
+    student_id: sid, status: document.getElementById('pr_status').value,
+    offer_role: document.getElementById('pr_role').value||null,
+    offer_package_lpa: parseFloat(document.getElementById('pr_pkg').value)||null,
+    joining_date: document.getElementById('pr_joining').value||null,
+    offer_letter_text: document.getElementById('pr_letter').value||null,
+    notes: document.getElementById('pr_notes').value||null,
+  };
+  const r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/placement-results`, body);
+  const d = await r.json();
+  if (r.ok) { bootstrap.Modal.getInstance(document.getElementById('resultModal'))?.hide(); showToast('Result saved! Student notified.','success'); loadDrive(); }
+  else showToast(d.detail||'Error','error');
+}
+
+// ─── Officer actions ───────────────────────────────────────
+function showOfficerModal(action) {
+  officerAction = action;
+  const configs = {
+    approve:   {title:'Approve Drive',date:true,  btn:'btn-success',  txt:'Approve'},
+    reschedule:{title:'Reschedule',   date:true,  btn:'btn-warning',  txt:'Reschedule'},
+    reject:    {title:'Reject Drive', date:false, btn:'btn-danger',   txt:'Reject'},
+  };
+  const c = configs[action]||{title:action,date:false,btn:'btn-primary',txt:'Confirm'};
+  document.getElementById('oModalTitle').textContent = c.title;
+  document.getElementById('oDateWrap').style.display = c.date?'block':'none';
+  const btn = document.getElementById('oBtn');
+  btn.className = `btn fw-semibold ${c.btn}`;
+  btn.textContent = c.txt;
+  document.getElementById('o_notes').value='';
+  document.getElementById('o_date').value='';
+  new bootstrap.Modal(document.getElementById('officerModal')).show();
+}
+async function submitOfficerAction() {
+  const date = document.getElementById('o_date').value;
+  const notes = document.getElementById('o_notes').value;
+  if (officerAction==='reject'&&!notes) { showToast('Reason required for rejection','error'); return; }
+  let r;
+  if (officerAction==='approve') r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/approve`,{confirmed_date:date||null,officer_notes:notes});
+  else if (officerAction==='reschedule') r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/reschedule`,{confirmed_date:date||null,officer_notes:notes});
+  else r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/reject`,{officer_notes:notes});
+  const d = await r.json();
+  if (r.ok) { bootstrap.Modal.getInstance(document.getElementById('officerModal'))?.hide(); showToast(d.message||'Done','success'); loadDrive(); }
+  else showToast(d.detail||'Error','error');
+}
+async function toggleResponse() {
+  const r = await apiPut(`/api/campus-drive/drives/${DRIVE_ID}/response-toggle`,{});
+  const d = await r.json();
+  if (r.ok) { showToast(d.message,'success'); loadDrive(); }
+  else showToast(d.detail||'Error','error');
+}
+async function optIn() {
+  const r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/opt-in`,{});
+  const d = await r.json();
+  if (r.ok) { showToast('Opted in!','success'); loadDrive(); }
+  else showToast(d.detail||'Error','error');
+}
+async function optOut() {
+  if (!confirm('Opt out?')) return;
+  const r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/opt-out`,{});
+  if (r.ok) { showToast('Opted out','info'); loadDrive(); }
+}
+async function sendNotif() {
+  const body = {
+    title: document.getElementById('n_title').value.trim(),
+    message: document.getElementById('n_msg').value.trim(),
+    notif_type: document.getElementById('n_type').value,
+  };
+  if (!body.title||!body.message) { showToast('Title and message required','error'); return; }
+  const r = await apiPost(`/api/campus-drive/drives/${DRIVE_ID}/notify`,body);
+  if (r.ok) { bootstrap.Modal.getInstance(document.getElementById('notifyModal'))?.hide(); showToast('Notification sent!','success'); }
+}
+
+// ─── Utilities ─────────────────────────────────────────────
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtDate(iso){if(!iso)return'';return new Date(iso).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function roundLabel(rt){return{aptitude:'Aptitude',coding:'Coding',group_discussion:'Group Discussion',technical:'Technical',hr:'HR Interview',custom:'Custom'}[rt]||rt;}
+
+document.addEventListener('DOMContentLoaded',()=>{ loadDrive(); connectWS(); });
+</script>
+{% endblock %}

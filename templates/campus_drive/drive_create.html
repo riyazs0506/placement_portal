@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+{% block title %}Create Campus Drive{% endblock %}
+{% block page_title %}Create Campus Drive{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+<div class="col-lg-8">
+
+<!-- Step indicator -->
+<div class="d-flex align-items-center gap-0 mb-4" id="stepBar">
+  <div class="step-indicator active" id="step1ind" onclick="goStep(1)">
+    <div class="step-circle">1</div><div class="step-label">Job Details</div>
+  </div>
+  <div class="step-line"></div>
+  <div class="step-indicator" id="step2ind" onclick="goStep(2)">
+    <div class="step-circle">2</div><div class="step-label">Eligibility</div>
+  </div>
+  <div class="step-line"></div>
+  <div class="step-indicator" id="step3ind" onclick="goStep(3)">
+    <div class="step-circle">3</div><div class="step-label">Rounds Plan</div>
+  </div>
+  <div class="step-line"></div>
+  <div class="step-indicator" id="step4ind" onclick="goStep(4)">
+    <div class="step-circle">4</div><div class="step-label">Review</div>
+  </div>
+</div>
+
+<div id="alertBox" style="display:none;padding:12px 16px;border-radius:10px;font-size:.87rem;margin-bottom:14px;"></div>
+
+<!-- ════ STEP 1: Job Details ════ -->
+<div id="step1" class="card-custom p-4">
+  <h5 style="font-weight:700;margin-bottom:20px;"><i class="fas fa-briefcase me-2 text-primary"></i>Job Details</h5>
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label fw-semibold">Drive Title *</label>
+      <input type="text" class="form-control" id="f_title" placeholder="e.g. TCS Campus Recruitment Drive 2025">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold">Job / Internship Role *</label>
+      <input type="text" class="form-control" id="f_job_role" placeholder="e.g. Software Engineer">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold">Drive Type *</label>
+      <select class="form-select" id="f_drive_type" onchange="updateDriveTypeFields()">
+        <option value="recruitment">🏢 Recruitment (Full-time Job)</option>
+        <option value="internship">📚 Internship</option>
+        <option value="both">🔄 Internship + Recruitment</option>
+      </select>
+    </div>
+
+    <!-- Recruitment fields -->
+    <div class="col-md-4" id="salaryField">
+      <label class="form-label fw-semibold">Package (LPA) <small style="color:#94a3b8;">recruitment</small></label>
+      <div class="input-group">
+        <span class="input-group-text">₹</span>
+        <input type="number" class="form-control" id="f_package" placeholder="6.5" step="0.1" min="0">
+        <span class="input-group-text">LPA</span>
+      </div>
+    </div>
+
+    <!-- Internship fields -->
+    <div class="col-md-4" id="stipendField" style="display:none;">
+      <label class="form-label fw-semibold">Stipend <small style="color:#94a3b8;">internship</small></label>
+      <div class="input-group">
+        <span class="input-group-text">₹</span>
+        <input type="number" class="form-control" id="f_stipend" placeholder="15000" min="0">
+        <span class="input-group-text">/mo</span>
+      </div>
+    </div>
+    <div class="col-md-4" id="durationField" style="display:none;">
+      <label class="form-label fw-semibold">Duration <small style="color:#94a3b8;">internship</small></label>
+      <input type="text" class="form-control" id="f_duration" placeholder="e.g. 6 months">
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label fw-semibold">Work Location</label>
+      <input type="text" class="form-control" id="f_location" placeholder="e.g. Chennai / Remote">
+    </div>
+
+    <div class="col-12">
+      <label class="form-label fw-semibold">Job Description *</label>
+      <textarea class="form-control" id="f_jd" rows="5"
+        placeholder="Describe the role, responsibilities, tech stack, and what the candidate will work on..."></textarea>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label fw-semibold">Requested Visit Date</label>
+      <input type="datetime-local" class="form-control" id="f_date">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold">Venue / Hall</label>
+      <input type="text" class="form-control" id="f_venue" placeholder="e.g. Main Auditorium, Block A">
+    </div>
+  </div>
+  <div class="d-flex justify-content-end mt-4">
+    <button onclick="goStep(2)" class="btn btn-primary fw-semibold px-4" style="border-radius:10px;">
+      Next — Eligibility <i class="fas fa-arrow-right ms-2"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ════ STEP 2: Eligibility ════ -->
+<div id="step2" class="card-custom p-4" style="display:none;">
+  <h5 style="font-weight:700;margin-bottom:20px;"><i class="fas fa-filter me-2 text-success"></i>Eligibility Criteria</h5>
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label fw-semibold">Eligible Departments</label>
+      <div class="d-flex flex-wrap gap-2" id="deptBoxes">
+        <label class="dept-cb"><input type="checkbox" value="CS"> CS</label>
+        <label class="dept-cb"><input type="checkbox" value="IT"> IT</label>
+        <label class="dept-cb"><input type="checkbox" value="ECE"> ECE</label>
+        <label class="dept-cb"><input type="checkbox" value="EEE"> EEE</label>
+        <label class="dept-cb"><input type="checkbox" value="MECH"> MECH</label>
+        <label class="dept-cb"><input type="checkbox" value="CIVIL"> CIVIL</label>
+        <label class="dept-cb"><input type="checkbox" value="MBA"> MBA</label>
+        <label class="dept-cb"><input type="checkbox" value="MCA"> MCA</label>
+        <label class="dept-cb"><input type="checkbox" value="BSC"> BSC</label>
+        <label class="dept-cb"><input type="checkbox" value="MSC"> MSC</label>
+        <label class="dept-cb" style="background:#f1f5f9;"><input type="checkbox" value="ALL" onchange="toggleAllDepts(this)"> All Depts</label>
+      </div>
+      <div style="font-size:.75rem;color:#94a3b8;margin-top:4px;">Leave unchecked = all departments eligible</div>
+    </div>
+    <div class="col-12">
+      <label class="form-label fw-semibold">Eligible Batch Years</label>
+      <div class="d-flex flex-wrap gap-2">
+        <label class="dept-cb"><input type="checkbox" class="batch-cb" value="2023"> 2023</label>
+        <label class="dept-cb"><input type="checkbox" class="batch-cb" value="2024"> 2024</label>
+        <label class="dept-cb"><input type="checkbox" class="batch-cb" value="2025"> 2025</label>
+        <label class="dept-cb"><input type="checkbox" class="batch-cb" value="2026"> 2026</label>
+        <label class="dept-cb"><input type="checkbox" class="batch-cb" value="2027"> 2027</label>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Min CGPA</label>
+      <input type="number" class="form-control" id="f_cgpa" placeholder="6.5" step="0.1" min="0" max="10">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Min 10th %</label>
+      <input type="number" class="form-control" id="f_tenth" placeholder="60" step="0.1">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Min 12th %</label>
+      <input type="number" class="form-control" id="f_twelfth" placeholder="60" step="0.1">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Max Backlogs</label>
+      <input type="number" class="form-control" id="f_backlogs" value="0" min="0">
+    </div>
+  </div>
+  <div class="d-flex justify-content-between mt-4">
+    <button onclick="goStep(1)" class="btn btn-outline-secondary px-4" style="border-radius:10px;">
+      <i class="fas fa-arrow-left me-2"></i>Back
+    </button>
+    <button onclick="goStep(3)" class="btn btn-primary fw-semibold px-4" style="border-radius:10px;">
+      Next — Plan Rounds <i class="fas fa-arrow-right ms-2"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ════ STEP 3: Round Plan ════ -->
+<div id="step3" class="card-custom p-4" style="display:none;">
+  <h5 style="font-weight:700;margin-bottom:6px;"><i class="fas fa-layer-group me-2 text-warning"></i>Plan Your Selection Rounds</h5>
+  <p style="font-size:.83rem;color:#64748b;margin-bottom:20px;">Add the rounds you plan to conduct. You can reorder them. These guide HR during the drive.</p>
+  <div id="roundsList" class="mb-3"></div>
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <button onclick="addRound('aptitude')"        class="round-add-btn"><i class="fas fa-brain me-1"></i>Aptitude</button>
+    <button onclick="addRound('coding')"          class="round-add-btn"><i class="fas fa-code me-1"></i>Coding</button>
+    <button onclick="addRound('group_discussion')"class="round-add-btn"><i class="fas fa-users me-1"></i>Group Discussion</button>
+    <button onclick="addRound('technical')"       class="round-add-btn"><i class="fas fa-laptop-code me-1"></i>Technical</button>
+    <button onclick="addRound('hr')"              class="round-add-btn"><i class="fas fa-user-tie me-1"></i>HR Interview</button>
+    <button onclick="addRound('custom')"          class="round-add-btn"><i class="fas fa-plus me-1"></i>Custom</button>
+  </div>
+  <div style="background:#eff6ff;border-radius:10px;padding:12px;font-size:.8rem;color:#1d4ed8;">
+    <i class="fas fa-info-circle me-1"></i>These are planned rounds. You will add actual rounds with students after the drive is approved.
+  </div>
+  <div class="d-flex justify-content-between mt-4">
+    <button onclick="goStep(2)" class="btn btn-outline-secondary px-4" style="border-radius:10px;">
+      <i class="fas fa-arrow-left me-2"></i>Back
+    </button>
+    <button onclick="goStep(4)" class="btn btn-primary fw-semibold px-4" style="border-radius:10px;">
+      Review & Submit <i class="fas fa-arrow-right ms-2"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ════ STEP 4: Review ════ -->
+<div id="step4" class="card-custom p-4" style="display:none;">
+  <h5 style="font-weight:700;margin-bottom:20px;"><i class="fas fa-check-circle me-2 text-success"></i>Review & Submit</h5>
+  <div id="reviewContent"></div>
+  <div class="d-flex justify-content-between mt-4">
+    <button onclick="goStep(3)" class="btn btn-outline-secondary px-4" style="border-radius:10px;">
+      <i class="fas fa-arrow-left me-2"></i>Back
+    </button>
+    <button onclick="submitDrive()" class="btn btn-success fw-semibold px-5" style="border-radius:10px;" id="submitBtn">
+      <i class="fas fa-paper-plane me-2"></i>Submit Drive for Approval
+    </button>
+  </div>
+</div>
+
+</div><!-- end col-lg-8 -->
+
+<!-- Right panel -->
+<div class="col-lg-4">
+  <div class="card-custom p-4 sticky-top" style="top:80px;">
+    <h6 style="font-weight:700;margin-bottom:14px;"><i class="fas fa-road me-2 text-primary"></i>Drive Workflow</h6>
+    <div style="font-size:.82rem;color:#64748b;line-height:2;">
+      <div><span style="color:#2563eb;font-weight:700;">1.</span> Submit drive request</div>
+      <div><span style="color:#7c3aed;font-weight:700;">2.</span> Placement officer approves</div>
+      <div><span style="color:#10b981;font-weight:700;">3.</span> Students opt-in / opt-out</div>
+      <div><span style="color:#f59e0b;font-weight:700;">4.</span> Close response, start rounds</div>
+      <div><span style="color:#ef4444;font-weight:700;">5.</span> HR selects students each round</div>
+      <div><span style="color:#6366f1;font-weight:700;">6.</span> Final: offer letters sent</div>
+    </div>
+    <hr style="margin:14px 0;">
+    <div id="plannedRoundsPreview">
+      <div style="font-size:.78rem;color:#94a3b8;">No rounds planned yet</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end row -->
+
+<style>
+.step-indicator{display:flex;flex-direction:column;align-items:center;cursor:pointer;min-width:80px;}
+.step-circle{width:32px;height:32px;border-radius:50%;background:#e2e8f0;color:#94a3b8;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.step-label{font-size:.68rem;color:#94a3b8;margin-top:4px;font-weight:500;white-space:nowrap;}
+.step-line{flex:1;height:2px;background:#e2e8f0;margin:0 4px;margin-bottom:20px;}
+.step-indicator.active .step-circle{background:#2563eb;color:#fff;}
+.step-indicator.active .step-label{color:#2563eb;}
+.step-indicator.done .step-circle{background:#10b981;color:#fff;}
+.step-indicator.done .step-label{color:#10b981;}
+.dept-cb{display:inline-flex;align-items:center;gap:5px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.83rem;font-weight:500;transition:all .2s;user-select:none;}
+.dept-cb:has(input:checked){background:#eff6ff;border-color:#2563eb;color:#2563eb;}
+.dept-cb input{width:14px;height:14px;accent-color:#2563eb;}
+.round-add-btn{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 14px;font-size:.8rem;font-weight:600;cursor:pointer;color:#374151;transition:all .2s;}
+.round-add-btn:hover{background:#eff6ff;border-color:#2563eb;color:#2563eb;}
+.round-tag{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.round-tag:hover{border-color:#93c5fd;}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentStep = 1;
+let plannedRounds = [];
+const ROUND_LABELS = {
+  aptitude:'Aptitude Test', coding:'Coding Round', group_discussion:'Group Discussion',
+  technical:'Technical Interview', hr:'HR Interview', custom:'Custom Round'
+};
+const ROUND_ICONS = {
+  aptitude:'fa-brain', coding:'fa-code', group_discussion:'fa-users',
+  technical:'fa-laptop-code', hr:'fa-user-tie', custom:'fa-star'
+};
+
+function goStep(n) {
+  // Validate before moving forward
+  if (n > currentStep) {
+    if (currentStep === 1 && !validateStep1()) return;
+  }
+  document.getElementById(`step${currentStep}`).style.display='none';
+  document.getElementById(`step${n}`).style.display='block';
+  // Update step indicators
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById(`step${i}ind`);
+    el.className = 'step-indicator' + (i === n ? ' active' : i < n ? ' done' : '');
+  });
+  currentStep = n;
+  if (n === 4) buildReview();
+}
+
+function validateStep1() {
+  const title = document.getElementById('f_title').value.trim();
+  const role  = document.getElementById('f_job_role').value.trim();
+  const jd    = document.getElementById('f_jd').value.trim();
+  if (!title) { showAlert('Drive title is required.'); return false; }
+  if (!role)  { showAlert('Job role is required.'); return false; }
+  if (!jd)    { showAlert('Job description is required.'); return false; }
+  hideAlert(); return true;
+}
+
+function showAlert(msg) {
+  const el = document.getElementById('alertBox');
+  el.style.display='block'; el.style.background='#fee2e2'; el.style.color='#dc2626';
+  el.textContent = msg;
+}
+function hideAlert() { document.getElementById('alertBox').style.display='none'; }
+
+function updateDriveTypeFields() {
+  const t = document.getElementById('f_drive_type').value;
+  document.getElementById('salaryField').style.display  = t !== 'internship' ? 'block' : 'none';
+  document.getElementById('stipendField').style.display = t !== 'recruitment' ? 'block' : 'none';
+  document.getElementById('durationField').style.display= t !== 'recruitment' ? 'block' : 'none';
+}
+
+function toggleAllDepts(cb) {
+  document.querySelectorAll('#deptBoxes input[type=checkbox]').forEach(c => {
+    if (c !== cb) c.checked = cb.checked;
+  });
+}
+
+// ── Round Planning ─────────────────────────────────────────────
+function addRound(type) {
+  plannedRounds.push({type, name: ROUND_LABELS[type] || 'Custom Round', order: plannedRounds.length + 1});
+  renderRoundsList();
+  renderRoundsPreview();
+}
+
+function removeRound(idx) {
+  plannedRounds.splice(idx, 1);
+  plannedRounds.forEach((r,i) => r.order = i+1);
+  renderRoundsList();
+  renderRoundsPreview();
+}
+
+function renderRoundsList() {
+  const div = document.getElementById('roundsList');
+  if (!plannedRounds.length) {
+    div.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:.83rem;border:1.5px dashed #e2e8f0;border-radius:10px;">No rounds added yet. Click a round type above to add.</div>';
+    return;
+  }
+  div.innerHTML = plannedRounds.map((r, i) => `
+    <div class="round-tag">
+      <div class="d-flex align-items-center gap-2">
+        <div style="width:28px;height:28px;background:#eff6ff;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#2563eb;font-size:.8rem;">
+          <i class="fas ${ROUND_ICONS[r.type]||'fa-list'}"></i>
+        </div>
+        <div>
+          <div style="font-weight:600;font-size:.85rem;">Round ${r.order}: ${r.name}</div>
+          ${r.type==='custom' ? `<input type="text" placeholder="Custom name..." 
+            style="border:1px solid #e2e8f0;border-radius:6px;padding:2px 8px;font-size:.75rem;margin-top:2px;"
+            oninput="plannedRounds[${i}].name=this.value">` : ''}
+        </div>
+      </div>
+      <button onclick="removeRound(${i})" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.9rem;padding:4px 8px;" title="Remove">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>`).join('');
+}
+
+function renderRoundsPreview() {
+  const div = document.getElementById('plannedRoundsPreview');
+  if (!plannedRounds.length) {
+    div.innerHTML = '<div style="font-size:.78rem;color:#94a3b8;">No rounds planned yet</div>';
+    return;
+  }
+  div.innerHTML = `<div style="font-size:.75rem;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Planned Rounds</div>` +
+    plannedRounds.map(r => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.8rem;">
+      <span style="width:20px;height:20px;background:#eff6ff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#2563eb;font-size:.7rem;font-weight:700;flex-shrink:0;">${r.order}</span>
+      <span style="color:#374151;">${r.name}</span>
+    </div>`).join('');
+}
+
+// ── Review ─────────────────────────────────────────────────────
+function buildReview() {
+  const t  = document.getElementById('f_drive_type').value;
+  const pkg = document.getElementById('f_package').value;
+  const stip = document.getElementById('f_stipend').value;
+  const dur  = document.getElementById('f_duration').value;
+  const depts = [...document.querySelectorAll('#deptBoxes input:checked')].map(e=>e.value).filter(v=>v!=='ALL');
+  const batches = [...document.querySelectorAll('.batch-cb:checked')].map(e=>e.value);
+
+  document.getElementById('reviewContent').innerHTML = `
+    <div class="row g-3" style="font-size:.875rem;">
+      <div class="col-12">
+        <div style="background:#f8fafc;border-radius:10px;padding:16px;">
+          <div style="font-size:.72rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Job Information</div>
+          <div class="row g-2">
+            <div class="col-md-6"><span style="color:#64748b;">Title:</span> <strong>${document.getElementById('f_title').value}</strong></div>
+            <div class="col-md-6"><span style="color:#64748b;">Role:</span> <strong>${document.getElementById('f_job_role').value}</strong></div>
+            <div class="col-md-6"><span style="color:#64748b;">Type:</span> <strong>${t==='recruitment'?'Recruitment':t==='internship'?'Internship':'Internship + Recruitment'}</strong></div>
+            <div class="col-md-6"><span style="color:#64748b;">${t!=='internship'?'Package:':'Stipend:'}</span> <strong>${t!=='internship'&&pkg?'₹'+pkg+' LPA':stip?'₹'+stip+'/mo':'Not specified'}</strong></div>
+            ${dur?`<div class="col-md-6"><span style="color:#64748b;">Duration:</span> <strong>${dur}</strong></div>`:''}
+            <div class="col-md-6"><span style="color:#64748b;">Location:</span> <strong>${document.getElementById('f_location').value||'Not specified'}</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div style="background:#f8fafc;border-radius:10px;padding:16px;">
+          <div style="font-size:.72rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Eligibility</div>
+          <div style="font-size:.82rem;color:#475569;line-height:1.9;">
+            <div>Departments: <strong>${depts.length?depts.join(', '):'All'}</strong></div>
+            <div>Batches: <strong>${batches.length?batches.join(', '):'All'}</strong></div>
+            <div>Min CGPA: <strong>${document.getElementById('f_cgpa').value||'None'}</strong></div>
+            <div>Max Backlogs: <strong>${document.getElementById('f_backlogs').value||'0'}</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div style="background:#f8fafc;border-radius:10px;padding:16px;">
+          <div style="font-size:.72rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Planned Rounds (${plannedRounds.length})</div>
+          ${plannedRounds.length
+            ? plannedRounds.map(r=>`<div style="font-size:.82rem;color:#475569;">Round ${r.order}: ${r.name}</div>`).join('')
+            : '<div style="font-size:.82rem;color:#94a3b8;">No rounds planned</div>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Submit ─────────────────────────────────────────────────────
+async function submitDrive() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-2"></i>Submitting…';
+
+  const depts = [...document.querySelectorAll('#deptBoxes input:checked')].map(e=>e.value).filter(v=>v!=='ALL');
+  const batches= [...document.querySelectorAll('.batch-cb:checked')].map(e=>parseInt(e.value));
+
+  const body = {
+    title:                document.getElementById('f_title').value.trim(),
+    job_role:             document.getElementById('f_job_role').value.trim(),
+    job_description:      document.getElementById('f_jd').value,
+    drive_type:           document.getElementById('f_drive_type').value,
+    package_lpa:          parseFloat(document.getElementById('f_package').value)||null,
+    stipend_amount:       parseFloat(document.getElementById('f_stipend').value)||null,
+    internship_duration:  document.getElementById('f_duration').value||null,
+    location:             document.getElementById('f_location').value||null,
+    eligible_departments: depts,
+    eligible_batches:     batches,
+    min_cgpa:             parseFloat(document.getElementById('f_cgpa').value)||null,
+    min_tenth_percent:    parseFloat(document.getElementById('f_tenth').value)||null,
+    min_twelfth_percent:  parseFloat(document.getElementById('f_twelfth').value)||null,
+    max_backlogs:         parseInt(document.getElementById('f_backlogs').value)||0,
+    requested_date:       document.getElementById('f_date').value||null,
+    venue:                document.getElementById('f_venue').value||null,
+    planned_rounds:       plannedRounds.map(r=>r.type),
+  };
+
+  const resp = await apiPost('/api/campus-drive/create', body);
+  const d = await resp.json();
+  if (resp.ok) {
+    showToast('Drive submitted for approval!', 'success');
+    setTimeout(()=>window.location.href='/campus-drives/'+d.drive_id, 1200);
+  } else {
+    showAlert(d.detail || 'Submission failed');
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane me-2"></i>Submit Drive for Approval';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateDriveTypeFields();
+  renderRoundsList();
+  renderRoundsPreview();
+});
+</script>
+{% endblock %}

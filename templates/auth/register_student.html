@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration – Placement Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Inter',sans-serif;background:#0f172a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;}
+        body::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(16,185,129,.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(37,99,235,.12) 0%,transparent 60%);}
+        .wrap{position:relative;z-index:10;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:24px;backdrop-filter:blur(20px);box-shadow:0 32px 64px rgba(0,0,0,.5);width:600px;max-width:100%;padding:36px;}
+        .brand{text-align:center;margin-bottom:28px;}
+        .brand-icon{width:52px;height:52px;background:linear-gradient(135deg,#10b981,#2563eb);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px;}
+        h1{font-family:'Space Grotesk',sans-serif;color:#fff;font-size:1.4rem;font-weight:700;}
+        .sub{color:rgba(255,255,255,.4);font-size:.83rem;margin-top:4px;}
+        .info-banner{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:10px 14px;color:#6ee7b7;font-size:.82rem;margin-bottom:20px;display:flex;align-items:center;gap:8px;}
+        .section-title{color:rgba(255,255,255,.6);font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:20px 0 10px;border-top:1px solid rgba(255,255,255,.07);padding-top:16px;}
+        .form-label{color:rgba(255,255,255,.7);font-size:.82rem;font-weight:500;margin-bottom:5px;}
+        .form-control,.form-select{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;padding:10px 13px;font-size:.88rem;transition:border .2s;}
+        .form-control:focus,.form-select:focus{background:rgba(255,255,255,.1);border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15);color:#fff;outline:none;}
+        .form-control::placeholder{color:rgba(255,255,255,.25);}
+        .form-select option{background:#1e293b;color:#fff;}
+        .btn-reg{width:100%;background:linear-gradient(135deg,#10b981,#2563eb);color:#fff;border:none;border-radius:10px;padding:12px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .2s;margin-top:8px;}
+        .btn-reg:hover{opacity:.9;transform:translateY(-1px);}
+        .alert-box{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:10px;color:#fca5a5;padding:10px 14px;font-size:.82rem;margin-bottom:14px;display:none;}
+        .login-link{text-align:center;margin-top:16px;color:rgba(255,255,255,.4);font-size:.83rem;}
+        .login-link a{color:#60a5fa;text-decoration:none;}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="brand">
+        <div class="brand-icon"><i class="fas fa-user-graduate text-white" style="font-size:20px;"></i></div>
+        <h1>Student Registration</h1>
+        <p class="sub">Create your student account — no secret key required</p>
+    </div>
+
+    <div class="info-banner"><i class="fas fa-info-circle"></i> Students can register freely. Staff and company members need a secret key.</div>
+    <div class="alert-box" id="alertBox"></div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">Full Name *</label>
+            <input type="text" class="form-control" id="name" placeholder="Your full name">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Email Address *</label>
+            <input type="email" class="form-control" id="email" placeholder="your@email.com">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Password *</label>
+            <input type="password" class="form-control" id="password" placeholder="Min 6 characters">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Roll Number</label>
+            <input type="text" class="form-control" id="roll_number" placeholder="e.g. 21CS001">
+        </div>
+    </div>
+
+    <div class="section-title">Academic Details</div>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Department *</label>
+            <select class="form-select" id="department">
+                <option value="">Select</option>
+                <option>CS</option><option>IT</option><option>ECE</option>
+                <option>EEE</option><option>MECH</option><option>CIVIL</option>
+                <option>MBA</option><option>MCA</option><option>BSC</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Batch Year *</label>
+            <select class="form-select" id="batch_year">
+                <option value="">Select</option>
+                <option>2024</option><option>2025</option><option>2026</option><option>2027</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">CGPA</label>
+            <input type="number" class="form-control" id="cgpa" placeholder="e.g. 8.5" step="0.01" min="0" max="10">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">10th %</label>
+            <input type="number" class="form-control" id="tenth_percent" placeholder="e.g. 90" step="0.01" min="0" max="100">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">12th %</label>
+            <input type="number" class="form-control" id="twelfth_percent" placeholder="e.g. 85" step="0.01" min="0" max="100">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Active Backlogs</label>
+            <input type="number" class="form-control" id="backlogs" value="0" min="0">
+        </div>
+    </div>
+
+    <button class="btn-reg" onclick="doRegister()" id="regBtn">
+        <span id="regText"><i class="fas fa-user-plus me-2"></i>Create Student Account</span>
+        <span id="regSpinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i> Registering…</span>
+    </button>
+    <div class="login-link">Already have an account? <a href="/login">Sign in here</a></div>
+</div>
+
+<script>
+async function doRegister() {
+    const alertBox = document.getElementById('alertBox');
+    alertBox.style.display = 'none';
+
+    const body = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        role: 'student',
+        roll_number: document.getElementById('roll_number').value.trim() || null,
+        department: document.getElementById('department').value || null,
+        batch_year: parseInt(document.getElementById('batch_year').value) || null,
+        cgpa: parseFloat(document.getElementById('cgpa').value) || null,
+        tenth_percent: parseFloat(document.getElementById('tenth_percent').value) || null,
+        twelfth_percent: parseFloat(document.getElementById('twelfth_percent').value) || null,
+        backlogs: parseInt(document.getElementById('backlogs').value) || 0,
+    };
+
+    if (!body.name || !body.email || !body.password) {
+        alertBox.textContent = 'Name, email and password are required.';
+        alertBox.style.display = 'block'; return;
+    }
+    if (body.password.length < 6) {
+        alertBox.textContent = 'Password must be at least 6 characters.';
+        alertBox.style.display = 'block'; return;
+    }
+
+    document.getElementById('regText').style.display = 'none';
+    document.getElementById('regSpinner').style.display = 'inline';
+    document.getElementById('regBtn').disabled = true;
+
+    try {
+        const resp = await fetch('/api/users/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            alertBox.textContent = data.detail || 'Registration failed.';
+            alertBox.style.display = 'block';
+        } else {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            window.location.href = '/dashboard';
+        }
+    } catch (e) {
+        alertBox.textContent = 'Network error. Try again.';
+        alertBox.style.display = 'block';
+    } finally {
+        document.getElementById('regText').style.display = 'inline';
+        document.getElementById('regSpinner').style.display = 'none';
+        document.getElementById('regBtn').disabled = false;
+    }
+}
+</script>
+</body>
+</html>

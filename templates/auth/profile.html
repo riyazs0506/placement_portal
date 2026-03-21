@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div id="profileContent"><div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div></div>
+
+<style>
+.profile-avatar{width:90px;height:90px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;font-weight:700;color:#fff;flex-shrink:0;}
+.completeness-bar{height:8px;border-radius:10px;background:#e2e8f0;overflow:hidden;margin:6px 0;}
+.completeness-fill{height:100%;border-radius:10px;transition:width .6s;}
+.tag-chip{display:inline-flex;align-items:center;gap:5px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:20px;padding:3px 10px;font-size:.78rem;font-weight:500;margin:2px;}
+.tag-chip .rm{cursor:pointer;color:#93c5fd;font-size:.7rem;transition:color .15s;}
+.tag-chip .rm:hover{color:#ef4444;}
+.cert-card,.proj-card{border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:8px;position:relative;}
+.cert-card:hover,.proj-card:hover{border-color:#93c5fd;}
+.field-label{font-size:.75rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
+.edit-input{width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:.875rem;transition:border .2s;}
+.edit-input:focus{border-color:#2563eb;outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.08);}
+.section-header{font-weight:700;font-size:.95rem;margin-bottom:14px;display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:2px solid #f1f5f9;}
+.link-btn{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:8px;font-size:.78rem;font-weight:600;text-decoration:none;border:1.5px solid #e2e8f0;color:#475569;transition:all .15s;}
+.link-btn:hover{border-color:#2563eb;color:#2563eb;background:#eff6ff;}
+.missing-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.82rem;color:#64748b;border-bottom:1px solid #f1f5f9;}
+.missing-item:last-child{border:none;}
+.save-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f0;padding:12px 20px;display:none;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,.06);}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const VIEW_UID = {{ view_user_id if view_user_id is defined else 'null' }};
+const ME = JSON.parse(localStorage.getItem('user')||'{}');
+const isOwnProfile = !VIEW_UID || VIEW_UID == ME.id;
+const isStaff = ['head_admin','placement_officer','senior_staff','staff','junior_staff'].includes(ME.role);
+const isCompany = ME.role?.startsWith('company') || ME.role==='company';
+
+let profileData = null;
+let editing = false;
+let tags = {skills:[], languages:[], certifications:[], projects:[]};
+
+async function loadProfile() {
+  const url = VIEW_UID ? `/api/users/profile/${VIEW_UID}` : '/api/users/me';
+  const r = await apiGet(url);
+  if (!r.ok) { document.getElementById('profileContent').innerHTML='<div class="alert alert-danger m-4">Profile not found.</div>'; return; }
+  profileData = await r.json();
+  tags.skills         = [...(profileData.skills||[])];
+  tags.languages      = [...(profileData.languages||[])];
+  tags.certifications = JSON.parse(JSON.stringify(profileData.certifications||[]));
+  tags.projects       = JSON.parse(JSON.stringify(profileData.projects||[]));
+  renderProfile();
+}
+
+function getInitials(name) {
+  return (name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+}
+function avatarColor(name) {
+  const colors=['#2563eb','#7c3aed','#10b981','#f59e0b','#ef4444','#6366f1'];
+  return colors[(name||'').charCodeAt(0)%colors.length];
+}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtDate(iso){return iso?new Date(iso).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):''}
+
+function renderProfile() {
+  const u = profileData;
+  const comp = u.completeness || {};
+  const isStudent = u.role === 'student';
+  const editable = isOwnProfile && !VIEW_UID;
+
+  document.getElementById('profileContent').innerHTML = `
+  <div class="row g-4">
+    <!-- Left column -->
+    <div class="col-lg-4">
+      <!-- Avatar + basic info -->
+      <div class="card-custom p-4 mb-3 text-center">
+        <div class="profile-avatar mx-auto mb-3" style="background:${avatarColor(u.name)};">
+          ${getInitials(u.name)}
+        </div>
+        <h5 style="font-weight:700;margin-bottom:3px;" id="disp_name">${esc(u.name)}</h5>
+        <div style="font-size:.82rem;color:#7c3aed;font-weight:600;margin-bottom:3px;">${u.role?.replace(/_/g,' ').toUpperCase()}</div>
+        <div style="font-size:.8rem;color:#64748b;">${esc(u.email)}</div>
+        ${u.phone?`<div style="font-size:.8rem;color:#64748b;margin-top:2px;"><i class="fas fa-phone me-1"></i>${esc(u.phone)}</div>`:''}
+        ${u.department?`<div style="font-size:.8rem;color:#64748b;margin-top:2px;"><i class="fas fa-building me-1"></i>${esc(u.department)} · ${u.batch_year||''}</div>`:''}
+
+        <!-- Social links -->
+        <div class="d-flex justify-content-center flex-wrap gap-2 mt-3">
+          ${u.linkedin_url?`<a href="${esc(u.linkedin_url)}" target="_blank" class="link-btn" style="border-color:#0a66c2;color:#0a66c2;"><i class="fab fa-linkedin"></i>LinkedIn</a>`:''}
+          ${u.github_url?`<a href="${esc(u.github_url)}" target="_blank" class="link-btn" style="border-color:#333;color:#333;"><i class="fab fa-github"></i>GitHub</a>`:''}
+          ${u.portfolio_url?`<a href="${esc(u.portfolio_url)}" target="_blank" class="link-btn"><i class="fas fa-globe"></i>Portfolio</a>`:''}
+          ${u.resume_url?`<a href="${esc(u.resume_url)}" target="_blank" class="link-btn" style="border-color:#10b981;color:#10b981;"><i class="fas fa-file-pdf"></i>Resume</a>`:''}
+        </div>
+
+        ${editable?`<button onclick="startEdit()" class="btn btn-primary w-100 mt-3" style="border-radius:8px;" id="editBtn"><i class="fas fa-edit me-1"></i>Edit Profile</button>`:''}
+      </div>
+
+      <!-- Completeness (students only) -->
+      ${isStudent?`<div class="card-custom p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span style="font-weight:700;font-size:.9rem;">Profile Completeness</span>
+          <span style="font-size:1.1rem;font-weight:700;color:${comp.score>=80?'#10b981':comp.score>=50?'#f59e0b':'#ef4444'};">${comp.score||0}%</span>
+        </div>
+        <div class="completeness-bar"><div class="completeness-fill" style="width:${comp.score||0}%;background:${comp.score>=80?'#10b981':comp.score>=50?'#f59e0b':'#ef4444'};"></div></div>
+        <div style="font-size:.73rem;color:#64748b;margin-bottom:8px;">${comp.done||0} of ${comp.total||0} fields completed</div>
+        ${(comp.missing||[]).length?`<div style="font-size:.73rem;color:#94a3b8;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Missing</div>
+        ${comp.missing.slice(0,5).map(m=>`<div class="missing-item"><i class="fas fa-circle" style="font-size:.4rem;color:#e2e8f0;"></i>${m}</div>`).join('')}
+        ${comp.missing.length>5?`<div style="font-size:.72rem;color:#94a3b8;">+${comp.missing.length-5} more…</div>`:''}`:
+        `<div style="font-size:.8rem;color:#10b981;font-weight:600;"><i class="fas fa-check-circle me-1"></i>Profile is complete!</div>`}
+      </div>`:'' }
+
+      <!-- Academic snapshot (students) -->
+      ${isStudent?`<div class="card-custom p-4">
+        <div class="section-header"><i class="fas fa-graduation-cap text-primary"></i>Academics</div>
+        <div class="row g-2" style="font-size:.82rem;">
+          ${[
+            ['Roll No', u.roll_number],['Department', u.department],['Batch', u.batch_year],
+            ['CGPA', u.cgpa],['10th %', u.tenth_percent?u.tenth_percent+'%':''],
+            ['12th %', u.twelfth_percent?u.twelfth_percent+'%':''],['Backlogs', u.backlogs??0]
+          ].map(([l,v])=>`<div class="col-6"><span style="color:#94a3b8;">${l}</span><div style="font-weight:600;color:#0f172a;">${v||'—'}</div></div>`).join('')}
+        </div>
+      </div>`:''}
+    </div>
+
+    <!-- Right column -->
+    <div class="col-lg-8">
+      <!-- Bio -->
+      ${u.bio?`<div class="card-custom p-4 mb-3">
+        <div class="section-header"><i class="fas fa-user text-primary"></i>About</div>
+        <p style="font-size:.875rem;color:#475569;line-height:1.8;margin:0;">${esc(u.bio)}</p>
+      </div>`:''}
+
+      <!-- Skills -->
+      ${(u.skills||[]).length?`<div class="card-custom p-4 mb-3">
+        <div class="section-header"><i class="fas fa-code text-purple" style="color:#7c3aed;"></i>Skills</div>
+        <div>${u.skills.map(s=>`<span class="tag-chip"><i class="fas fa-check-circle" style="font-size:.65rem;"></i>${esc(s)}</span>`).join('')}</div>
+      </div>`:''}
+
+      <!-- Languages -->
+      ${(u.languages||[]).length?`<div class="card-custom p-4 mb-3">
+        <div class="section-header"><i class="fas fa-language text-green" style="color:#10b981;"></i>Languages</div>
+        <div>${u.languages.map(l=>`<span class="tag-chip" style="background:#f0fdf4;color:#166534;border-color:#bbf7d0;">${esc(l)}</span>`).join('')}</div>
+      </div>`:''}
+
+      <!-- Certifications -->
+      ${(u.certifications||[]).length?`<div class="card-custom p-4 mb-3">
+        <div class="section-header"><i class="fas fa-certificate" style="color:#f59e0b;"></i>Certifications</div>
+        ${u.certifications.map(c=>`<div class="cert-card">
+          <div style="font-weight:600;font-size:.88rem;">${esc(c.name||c)}</div>
+          ${c.issuer?`<div style="font-size:.78rem;color:#64748b;"><i class="fas fa-building me-1"></i>${esc(c.issuer)}</div>`:''}
+          ${c.year?`<div style="font-size:.75rem;color:#94a3b8;">${c.year}</div>`:''}
+        </div>`).join('')}
+      </div>`:''}
+
+      <!-- Projects -->
+      ${(u.projects||[]).length?`<div class="card-custom p-4 mb-3">
+        <div class="section-header"><i class="fas fa-project-diagram" style="color:#6366f1;"></i>Projects</div>
+        ${u.projects.map(p=>`<div class="proj-card">
+          <div style="font-weight:600;font-size:.88rem;">${esc(p.title||p)}</div>
+          ${p.desc?`<div style="font-size:.8rem;color:#475569;margin-top:4px;">${esc(p.desc)}</div>`:''}
+          ${p.url?`<a href="${esc(p.url)}" target="_blank" class="link-btn mt-2" style="font-size:.72rem;"><i class="fas fa-external-link-alt me-1"></i>View Project</a>`:''}
+        </div>`).join('')}
+      </div>`:''}
+
+      <!-- Placement activity (students) -->
+      ${isStudent?`<div id="placementActivity"></div>`:''}
+
+      <!-- Empty state for view-only -->
+      ${!u.bio && !(u.skills||[]).length && !(u.certifications||[]).length && !(u.projects||[]).length ?
+        `<div class="card-custom p-5 text-center">
+          <i class="fas fa-user-circle fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">Profile not filled yet</h5>
+          ${editable?`<p class="text-muted">Click "Edit Profile" to add your bio, skills, certifications and projects.</p>`:'<p class="text-muted">This student hasn\'t completed their profile yet.</p>'}
+        </div>` : ''}
+    </div>
+  </div>
+
+  <!-- ── EDIT FORM (hidden by default) ── -->
+  <div id="editForm" style="display:none;" class="mt-4">
+    <div class="card-custom p-4">
+      <h5 style="font-weight:700;margin-bottom:20px;"><i class="fas fa-edit me-2 text-primary"></i>Edit Profile</h5>
+
+      <!-- Personal -->
+      <div class="section-header"><i class="fas fa-user text-primary"></i>Personal Information</div>
+      <div class="row g-3 mb-4">
+        <div class="col-md-6"><div class="field-label">Full Name *</div><input class="edit-input" id="e_name" value="${esc(u.name||'')}"></div>
+        <div class="col-md-6"><div class="field-label">Phone Number</div><input class="edit-input" id="e_phone" value="${esc(u.phone||'')}" placeholder="+91 99999 99999"></div>
+        <div class="col-12"><div class="field-label">Address</div><textarea class="edit-input" id="e_address" rows="2" placeholder="Your address…">${esc(u.address||'')}</textarea></div>
+        <div class="col-12"><div class="field-label">Bio / About Me</div><textarea class="edit-input" id="e_bio" rows="3" placeholder="Brief intro about yourself, interests, career goals…">${esc(u.bio||'')}</textarea></div>
+      </div>
+
+      <!-- Academic (students only) -->
+      ${isStudent?`<div class="section-header"><i class="fas fa-graduation-cap text-primary"></i>Academic Details</div>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="field-label">Roll Number</div><input class="edit-input" id="e_roll" value="${esc(u.roll_number||'')}"></div>
+        <div class="col-md-4"><div class="field-label">Department</div>
+          <select class="edit-input" id="e_dept">
+            ${['CS','IT','ECE','EEE','MECH','CIVIL','MBA','MCA','BSC','BCA'].map(d=>`<option value="${d}" ${u.department===d?'selected':''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-md-4"><div class="field-label">Batch Year</div>
+          <select class="edit-input" id="e_batch">
+            ${[2024,2025,2026,2027,2028].map(y=>`<option value="${y}" ${u.batch_year==y?'selected':''}>${y}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-md-3"><div class="field-label">CGPA</div><input type="number" class="edit-input" id="e_cgpa" step="0.01" min="0" max="10" value="${u.cgpa||''}" placeholder="8.5"></div>
+        <div class="col-md-3"><div class="field-label">10th %</div><input type="number" class="edit-input" id="e_tenth" step="0.1" value="${u.tenth_percent||''}" placeholder="85.0"></div>
+        <div class="col-md-3"><div class="field-label">12th %</div><input type="number" class="edit-input" id="e_twelfth" step="0.1" value="${u.twelfth_percent||''}" placeholder="82.5"></div>
+        <div class="col-md-3"><div class="field-label">Active Backlogs</div><input type="number" class="edit-input" id="e_backlogs" min="0" value="${u.backlogs??0}"></div>
+      </div>`:''}
+
+      <!-- Career Links -->
+      <div class="section-header"><i class="fas fa-link text-primary"></i>Career Links</div>
+      <div class="row g-3 mb-4">
+        <div class="col-md-6"><div class="field-label"><i class="fab fa-linkedin me-1" style="color:#0a66c2;"></i>LinkedIn URL</div><input class="edit-input" id="e_linkedin" value="${esc(u.linkedin_url||'')}" placeholder="https://linkedin.com/in/yourname"></div>
+        <div class="col-md-6"><div class="field-label"><i class="fab fa-github me-1"></i>GitHub URL</div><input class="edit-input" id="e_github" value="${esc(u.github_url||'')}" placeholder="https://github.com/yourname"></div>
+        <div class="col-md-6"><div class="field-label"><i class="fas fa-globe me-1"></i>Portfolio URL</div><input class="edit-input" id="e_portfolio" value="${esc(u.portfolio_url||'')}" placeholder="https://yoursite.com"></div>
+        <div class="col-md-6"><div class="field-label"><i class="fas fa-file-pdf me-1" style="color:#ef4444;"></i>Resume URL</div><input class="edit-input" id="e_resume" value="${esc(u.resume_url||'')}" placeholder="Google Drive / Dropbox public link"></div>
+      </div>
+
+      <!-- Skills -->
+      <div class="section-header"><i class="fas fa-code" style="color:#7c3aed;"></i>Skills</div>
+      <div class="d-flex flex-wrap gap-1 mb-2" id="skillsDisplay"></div>
+      <div class="d-flex gap-2 mb-4">
+        <input class="edit-input" id="skillInput" placeholder="e.g. Python, React, SQL…" style="max-width:280px;" onkeydown="if(event.key==='Enter'||event.key===','){addTag('skills');event.preventDefault();}">
+        <button onclick="addTag('skills')" class="btn btn-outline-primary btn-sm" style="border-radius:8px;white-space:nowrap;"><i class="fas fa-plus me-1"></i>Add Skill</button>
+      </div>
+
+      <!-- Languages -->
+      <div class="section-header"><i class="fas fa-language" style="color:#10b981;"></i>Languages Known</div>
+      <div class="d-flex flex-wrap gap-1 mb-2" id="languagesDisplay"></div>
+      <div class="d-flex gap-2 mb-4">
+        <input class="edit-input" id="langInput" placeholder="e.g. English, Tamil, Hindi…" style="max-width:280px;" onkeydown="if(event.key==='Enter'||event.key===','){addTag('languages');event.preventDefault();}">
+        <button onclick="addTag('languages')" class="btn btn-outline-success btn-sm" style="border-radius:8px;white-space:nowrap;"><i class="fas fa-plus me-1"></i>Add Language</button>
+      </div>
+
+      <!-- Certifications -->
+      <div class="section-header"><i class="fas fa-certificate" style="color:#f59e0b;"></i>Certifications</div>
+      <div id="certsEdit" class="mb-2"></div>
+      <button onclick="addCert()" class="btn btn-outline-warning btn-sm mb-4" style="border-radius:8px;"><i class="fas fa-plus me-1"></i>Add Certification</button>
+
+      <!-- Projects -->
+      <div class="section-header"><i class="fas fa-project-diagram" style="color:#6366f1;"></i>Projects</div>
+      <div id="projectsEdit" class="mb-2"></div>
+      <button onclick="addProject()" class="btn btn-outline-secondary btn-sm mb-4" style="border-radius:8px;"><i class="fas fa-plus me-1"></i>Add Project</button>
+
+      <!-- Password change -->
+      <div class="section-header"><i class="fas fa-lock text-primary"></i>Change Password</div>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="field-label">Current Password</div><input type="password" class="edit-input" id="e_cur_pw" placeholder="Current password"></div>
+        <div class="col-md-4"><div class="field-label">New Password</div><input type="password" class="edit-input" id="e_new_pw" placeholder="New password (min 6 chars)"></div>
+        <div class="col-md-4 d-flex align-items-end"><button onclick="changePassword()" class="btn btn-outline-primary" style="border-radius:8px;width:100%;">Change Password</button></div>
+      </div>
+
+      <div class="d-flex gap-3">
+        <button onclick="saveProfile()" class="btn btn-primary fw-semibold" style="border-radius:8px;padding:10px 28px;" id="saveBtn">
+          <i class="fas fa-save me-2"></i>Save Profile
+        </button>
+        <button onclick="cancelEdit()" class="btn btn-outline-secondary" style="border-radius:8px;padding:10px 20px;">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+
+  renderTagDisplays();
+  renderCertsEdit();
+  renderProjectsEdit();
+  if (isStudent) loadPlacementActivity();
+}
+
+// ── Tag management ──────────────────────────────────────────────
+function renderTagDisplays() {
+  renderTags('skills', 'skillsDisplay', '#eff6ff', '#2563eb', '#bfdbfe');
+  renderTags('languages', 'languagesDisplay', '#f0fdf4', '#166534', '#bbf7d0');
+}
+
+function renderTags(type, divId, bg, fg, border) {
+  const div = document.getElementById(divId); if(!div)return;
+  div.innerHTML = tags[type].map((t,i)=>`<span class="tag-chip" style="background:${bg};color:${fg};border-color:${border};">
+    ${esc(t)} <span class="rm" onclick="removeTag('${type}',${i})">✕</span></span>`).join('');
+}
+
+function addTag(type) {
+  const input = document.getElementById(type==='skills'?'skillInput':'langInput');
+  const val = input.value.trim().replace(/,/g,'');
+  if (!val) return;
+  if (!tags[type].includes(val)) tags[type].push(val);
+  input.value='';
+  renderTagDisplays();
+}
+function removeTag(type, idx) { tags[type].splice(idx,1); renderTagDisplays(); }
+
+// ── Certifications ──────────────────────────────────────────────
+function renderCertsEdit() {
+  const div=document.getElementById('certsEdit'); if(!div)return;
+  div.innerHTML = tags.certifications.map((c,i)=>`<div class="cert-card d-flex gap-2 align-items-start mb-2">
+    <div class="flex-grow-1 row g-2">
+      <div class="col-md-5"><input class="edit-input" placeholder="Certification name *" value="${esc(c.name||c||'')}" oninput="tags.certifications[${i}].name=this.value"></div>
+      <div class="col-md-4"><input class="edit-input" placeholder="Issuer (e.g. Coursera)" value="${esc(c.issuer||'')}" oninput="tags.certifications[${i}].issuer=this.value"></div>
+      <div class="col-md-3"><input class="edit-input" placeholder="Year" value="${esc(c.year||'')}" oninput="tags.certifications[${i}].year=this.value"></div>
+    </div>
+    <button onclick="removeCert(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:4px;"><i class="fas fa-times"></i></button>
+  </div>`).join('');
+}
+function addCert() { tags.certifications.push({name:'',issuer:'',year:''}); renderCertsEdit(); }
+function removeCert(i) { tags.certifications.splice(i,1); renderCertsEdit(); }
+
+// ── Projects ────────────────────────────────────────────────────
+function renderProjectsEdit() {
+  const div=document.getElementById('projectsEdit'); if(!div)return;
+  div.innerHTML = tags.projects.map((p,i)=>`<div class="proj-card mb-2">
+    <div class="row g-2">
+      <div class="col-md-6"><input class="edit-input" placeholder="Project title *" value="${esc(p.title||p||'')}" oninput="tags.projects[${i}].title=this.value"></div>
+      <div class="col-md-6"><input class="edit-input" placeholder="GitHub/Live URL" value="${esc(p.url||'')}" oninput="tags.projects[${i}].url=this.value"></div>
+      <div class="col-12"><textarea class="edit-input" rows="2" placeholder="Brief description…" oninput="tags.projects[${i}].desc=this.value">${esc(p.desc||'')}</textarea></div>
+    </div>
+    <button onclick="removeProject(${i})" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#ef4444;cursor:pointer;"><i class="fas fa-times"></i></button>
+  </div>`).join('');
+}
+function addProject() { tags.projects.push({title:'',desc:'',url:''}); renderProjectsEdit(); }
+function removeProject(i) { tags.projects.splice(i,1); renderProjectsEdit(); }
+
+// ── Edit / Save / Cancel ─────────────────────────────────────────
+function startEdit() {
+  document.getElementById('editForm').style.display='block';
+  document.getElementById('editBtn').style.display='none';
+  document.getElementById('editForm').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cancelEdit() {
+  document.getElementById('editForm').style.display='none';
+  document.getElementById('editBtn').style.display='block';
+  // Reset tags to original
+  tags.skills         = [...(profileData.skills||[])];
+  tags.languages      = [...(profileData.languages||[])];
+  tags.certifications = JSON.parse(JSON.stringify(profileData.certifications||[]));
+  tags.projects       = JSON.parse(JSON.stringify(profileData.projects||[]));
+  renderTagDisplays(); renderCertsEdit(); renderProjectsEdit();
+}
+
+async function saveProfile() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-2"></i>Saving…';
+  const body = {
+    name:          document.getElementById('e_name')?.value.trim()||null,
+    phone:         document.getElementById('e_phone')?.value.trim()||null,
+    address:       document.getElementById('e_address')?.value.trim()||null,
+    bio:           document.getElementById('e_bio')?.value.trim()||null,
+    linkedin_url:  document.getElementById('e_linkedin')?.value.trim()||null,
+    github_url:    document.getElementById('e_github')?.value.trim()||null,
+    portfolio_url: document.getElementById('e_portfolio')?.value.trim()||null,
+    resume_url:    document.getElementById('e_resume')?.value.trim()||null,
+    skills:        tags.skills,
+    languages:     tags.languages,
+    certifications:tags.certifications.filter(c=>(c.name||c)),
+    projects:      tags.projects.filter(p=>(p.title||p)),
+  };
+  // Academic fields (students)
+  if (profileData.role==='student') {
+    body.roll_number   = document.getElementById('e_roll')?.value.trim()||null;
+    body.department    = document.getElementById('e_dept')?.value||null;
+    body.batch_year    = parseInt(document.getElementById('e_batch')?.value)||null;
+    body.cgpa          = parseFloat(document.getElementById('e_cgpa')?.value)||null;
+    body.tenth_percent = parseFloat(document.getElementById('e_tenth')?.value)||null;
+    body.twelfth_percent=parseFloat(document.getElementById('e_twelfth')?.value)||null;
+    body.backlogs      = parseInt(document.getElementById('e_backlogs')?.value)||0;
+  }
+  const r = await apiPut('/api/users/me', body);
+  const d = await r.json();
+  if (r.ok) {
+    // Update localStorage name
+    const stored = JSON.parse(localStorage.getItem('user')||'{}');
+    stored.name = body.name || stored.name;
+    localStorage.setItem('user', JSON.stringify(stored));
+    showToast('Profile saved!', 'success');
+    profileData = d.user;
+    tags.skills         = [...(profileData.skills||[])];
+    tags.languages      = [...(profileData.languages||[])];
+    tags.certifications = JSON.parse(JSON.stringify(profileData.certifications||[]));
+    tags.projects       = JSON.parse(JSON.stringify(profileData.projects||[]));
+    renderProfile();
+  } else showToast(d.detail||'Error saving', 'error');
+  btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Save Profile';
+}
+
+async function changePassword() {
+  const cur = document.getElementById('e_cur_pw').value;
+  const nw  = document.getElementById('e_new_pw').value;
+  if (!cur || !nw) { showToast('Enter both passwords','error'); return; }
+  const r = await apiPost('/api/users/me/password',{current_password:cur,new_password:nw});
+  const d = await r.json();
+  if (r.ok) {
+    showToast('Password changed!','success');
+    document.getElementById('e_cur_pw').value='';
+    document.getElementById('e_new_pw').value='';
+  } else showToast(d.detail||'Error','error');
+}
+
+// ── Placement activity (student's drives + results) ─────────────
+async function loadPlacementActivity() {
+  const div = document.getElementById('placementActivity');
+  if (!div) return;
+  div.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-muted"></i></div>';
+  try {
+    const r = await apiGet('/api/campus-drive/placement-results/mine');
+    const results = await r.json();
+    const ps = {selected:{bg:'#dcfce7',fg:'#16a34a',icon:'fa-check-circle',label:'Selected'},
+                shortlisted:{bg:'#dbeafe',fg:'#1d4ed8',icon:'fa-star',label:'Shortlisted'},
+                on_hold:{bg:'#fef9c3',fg:'#854d0e',icon:'fa-pause-circle',label:'On Hold'},
+                rejected:{bg:'#fee2e2',fg:'#dc2626',icon:'fa-times-circle',label:'Not Selected'}};
+    if (!results.length) {
+      div.innerHTML='<div class="card-custom p-4 text-center"><i class="fas fa-building fa-2x text-muted mb-2"></i><p class="text-muted" style="font-size:.85rem;">No placement activity yet. <a href="/campus-drives">Browse drives</a></p></div>';
+      return;
+    }
+    div.innerHTML=`<div class="card-custom p-4">
+      <div class="section-header"><i class="fas fa-building text-primary"></i>Placement Activity</div>
+      ${results.map(r=>{
+        const m = ps[r.status]||ps.rejected;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap;gap:8px;">
+          <div><div style="font-weight:600;font-size:.88rem;">${esc(r.drive_title)}</div>
+          <div style="font-size:.78rem;color:#7c3aed;">${esc(r.company)}</div>
+          ${r.offer_role?`<div style="font-size:.76rem;color:#64748b;"><i class="fas fa-briefcase me-1"></i>${esc(r.offer_role)} ${r.offer_package_lpa?'· '+r.offer_package_lpa+' LPA':''}</div>`:''}
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span style="background:${m.bg};color:${m.fg};padding:3px 10px;border-radius:10px;font-size:.72rem;font-weight:700;"><i class="fas ${m.icon} me-1"></i>${m.label}</span>
+            ${r.has_offer_letter&&r.status==='selected'?`<button onclick="apiDownload(\`/api/campus-drive/drives/${r.drive_id}/offer-letter/${profileData.id}\`,this)" class="btn btn-xs btn-success" style="font-size:.72rem;padding:2px 8px;border-radius:6px;border:none;cursor:pointer;"><i class="fas fa-download me-1"></i>Letter</button>`:''}
+          </div>
+        </div>`;}).join('')}
+    </div>`;
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
+{% endblock %}

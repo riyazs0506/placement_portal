@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam – Placement Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',sans-serif;background:#f1f5f9;min-height:100vh;}
+
+    /* ── Mobile block screen ── */
+    #mobileBlock{display:none;min-height:100vh;background:#0f172a;align-items:center;justify-content:center;}
+    .mobile-card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:40px 30px;max-width:360px;text-align:center;margin:20px;}
+    .mobile-card h2{font-family:'Space Grotesk',sans-serif;color:#f87171;margin-bottom:12px;}
+    .mobile-card p{color:rgba(255,255,255,.6);font-size:.9rem;line-height:1.7;}
+    .mobile-card .icon{font-size:3.5rem;margin-bottom:16px;}
+
+    /* ── All other screens ── */
+    #otpScreen,#waitScreen,#blockedScreen,#examScreen,#resultScreen{display:none;}
+    .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;}
+    .center-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:40px;max-width:460px;width:90%;text-align:center;backdrop-filter:blur(16px);}
+    .center-card h2{font-family:'Space Grotesk',sans-serif;color:#fff;margin-bottom:8px;}
+    .center-card p{color:rgba(255,255,255,.5);font-size:.875rem;}
+    .otp-input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;font-size:1.8rem;text-align:center;letter-spacing:.4em;padding:14px;width:100%;margin:16px 0;}
+    .otp-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.2);}
+    .btn-primary-exam{width:100%;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;border:none;border-radius:10px;padding:13px;font-weight:600;cursor:pointer;font-size:.95rem;transition:opacity .2s;}
+    .btn-primary-exam:hover{opacity:.9;}
+    .btn-primary-exam:disabled{opacity:.5;cursor:not-allowed;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .pulse{animation:pulse 2s infinite;}
+
+    /* ── Waiting screen ── */
+    #waitStudentList{max-height:200px;overflow-y:auto;margin-top:16px;text-align:left;}
+    .wait-student{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.07);margin-bottom:4px;font-size:.82rem;color:rgba(255,255,255,.8);}
+
+    /* ── Exam layout ── */
+    #examScreen{display:none;flex-direction:column;}
+    .exam-header{background:#0f172a;color:#fff;padding:12px 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .exam-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.95rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .timer{font-size:1.2rem;font-weight:700;font-variant-numeric:tabular-nums;padding:6px 16px;border-radius:8px;background:rgba(255,255,255,.1);flex-shrink:0;}
+    .timer.warn{background:rgba(245,158,11,.25);color:#fcd34d;}
+    .timer.danger{background:rgba(239,68,68,.3);color:#fca5a5;animation:flash .5s infinite;}
+    @keyframes flash{0%,100%{opacity:1}50%{opacity:.6}}
+    .mal-banner{background:#fef3c7;border-bottom:2px solid #f59e0b;padding:8px 20px;font-size:.83rem;font-weight:600;color:#92400e;display:none;}
+    .exam-body{display:flex;height:calc(100vh - 54px);}
+    .q-sidebar{width:220px;background:#fff;border-right:1px solid #e2e8f0;overflow-y:auto;padding:12px;flex-shrink:0;}
+    .q-sidebar h6{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+    .q-btn{width:34px;height:34px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;cursor:pointer;font-size:.8rem;font-weight:600;margin:2px;transition:all .15s;}
+    .q-btn.answered{background:#dcfce7;border-color:#16a34a;color:#16a34a;}
+    .q-btn.current{background:#2563eb;border-color:#2563eb;color:#fff;}
+    .q-main{flex:1;overflow-y:auto;padding:20px;}
+    .q-card{background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:22px;margin-bottom:16px;}
+    .q-num{font-size:.78rem;font-weight:600;color:#64748b;margin-bottom:8px;}
+    .q-text{font-size:.95rem;font-weight:500;color:#1e293b;margin-bottom:16px;line-height:1.6;}
+    .opt{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:1.5px solid #e2e8f0;margin-bottom:8px;cursor:pointer;transition:all .15s;}
+    .opt:hover{border-color:#2563eb;background:#eff6ff;}
+    .opt.selected{border-color:#2563eb;background:#eff6ff;}
+    .nav-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;display:flex;align-items:center;justify-content:center;}
+    .overlay-card{background:#fff;border-radius:16px;padding:28px;max-width:380px;width:90%;text-align:center;}
+    .result-card{background:#fff;border-radius:20px;padding:40px;max-width:500px;width:90%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.12);}
+    .score-circle{width:120px;height:120px;border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;}
+    </style>
+</head>
+<body>
+
+<!-- ══ MOBILE BLOCK ══════════════════════════════════ -->
+<div id="mobileBlock" style="display:none;">
+  <div class="mobile-card">
+    <div class="icon">🖥️</div>
+    <h2>Laptop/PC Only</h2>
+    <p>This exam can only be taken on a <strong>laptop or desktop computer</strong>.</p>
+    <p style="margin-top:12px;font-size:.82rem;opacity:.7;">Mobile phones and tablets are not allowed during exams for security and integrity reasons.</p>
+    <p style="margin-top:16px;font-size:.85rem;color:rgba(255,200,100,.8);">
+      Please switch to a laptop or desktop to continue.
+    </p>
+  </div>
+</div>
+
+<!-- ══ OTP SCREEN ════════════════════════════════════ -->
+<div id="otpScreen" class="center-screen">
+  <div class="center-card">
+    <div style="font-size:2.5rem;margin-bottom:12px;">🔐</div>
+    <h2 id="otpExamTitle">Enter OTP</h2>
+    <p id="otpExamDesc" style="margin-bottom:4px;">Ask your invigilator for the OTP</p>
+    <p id="otpBatchInfo" style="font-size:.78rem;color:rgba(255,200,100,.8);"></p>
+    <input type="text" class="otp-input" id="otpInput" maxlength="6" placeholder="_ _ _ _ _ _"
+           oninput="this.value=this.value.replace(/\D/g,'')"
+           onkeydown="if(event.key==='Enter')verifyOtp()">
+    <div id="otpError" style="color:#f87171;font-size:.82rem;margin-bottom:10px;display:none;"></div>
+    <button class="btn-primary-exam" id="otpBtn" onclick="verifyOtp()">
+      <i class="fas fa-unlock me-2"></i>Enter Exam
+    </button>
+  </div>
+</div>
+
+<!-- ══ WAIT SCREEN ════════════════════════════════════ -->
+<div id="waitScreen" class="center-screen">
+  <div class="center-card" style="max-width:520px;">
+    <div class="pulse" style="font-size:2.5rem;margin-bottom:12px;">⏳</div>
+    <h2 id="waitTitle">Waiting for Staff</h2>
+    <p id="waitDesc">Your OTP has been verified. Please wait for your invigilator to start the exam.</p>
+    <div style="background:rgba(37,99,235,.15);border-radius:10px;padding:12px;margin-top:16px;font-size:.78rem;color:rgba(255,255,255,.5);">
+      This page updates automatically when the exam begins.
+    </div>
+    <div id="waitStudentList"></div>
+  </div>
+</div>
+
+<!-- ══ BLOCKED SCREEN ════════════════════════════════ -->
+<div id="blockedScreen" class="center-screen">
+  <div class="center-card" style="border-color:rgba(239,68,68,.3);">
+    <div style="font-size:2.5rem;margin-bottom:12px;">🚫</div>
+    <h2 style="color:#f87171;">Access Denied</h2>
+    <p id="blockedMsg">You cannot access this exam.</p>
+    <a href="/dashboard" style="display:inline-block;margin-top:20px;background:#2563eb;color:#fff;border-radius:10px;padding:10px 24px;text-decoration:none;font-weight:600;">Back to Dashboard</a>
+  </div>
+</div>
+
+<!-- ══ EXAM SCREEN ════════════════════════════════════ -->
+<div id="examScreen">
+  <div class="mal-banner" id="malBanner">
+    ⚠️ Suspicious activity detected. This exam is being monitored. Continued violations will be reported.
+  </div>
+  <div class="exam-header">
+    <div class="exam-title" id="examHeaderTitle">Exam</div>
+    <div class="timer" id="timer">00:00</div>
+    <button onclick="openSubmitOverlay()" class="btn btn-warning btn-sm" style="font-weight:600;border-radius:8px;flex-shrink:0;">
+      <i class="fas fa-paper-plane me-1"></i>Submit
+    </button>
+  </div>
+  <div class="exam-body">
+    <div class="q-sidebar">
+      <h6>Questions</h6>
+      <div id="qNav"></div>
+      <hr style="margin:12px 0;">
+      <div style="font-size:.68rem;color:#64748b;line-height:2;">
+        <div><span style="display:inline-block;width:12px;height:12px;background:#dcfce7;border:1px solid #16a34a;border-radius:3px;margin-right:4px;"></span>Answered</div>
+        <div><span style="display:inline-block;width:12px;height:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:3px;margin-right:4px;"></span>Not answered</div>
+      </div>
+      <hr style="margin:12px 0;">
+      <div id="sidebarStats" style="font-size:.72rem;color:#64748b;"></div>
+    </div>
+    <div class="q-main" id="qMain"></div>
+  </div>
+</div>
+
+<!-- ══ SUBMIT OVERLAY ════════════════════════════════ -->
+<div class="overlay" id="submitOverlay" style="display:none;">
+  <div class="overlay-card">
+    <i class="fas fa-paper-plane fa-2x text-primary mb-3"></i>
+    <h5 style="font-weight:700;margin-bottom:8px;">Submit Exam?</h5>
+    <p id="submitSummary" style="font-size:.875rem;color:#64748b;margin-bottom:16px;"></p>
+    <div id="malWarn" style="display:none;background:#fef3c7;border-radius:8px;padding:10px;font-size:.82rem;color:#92400e;margin-bottom:14px;"></div>
+    <div class="d-flex gap-2 justify-content-center">
+      <button onclick="closeOverlay()" class="btn btn-outline-secondary" style="border-radius:8px;">Cancel</button>
+      <button onclick="submitExam()" class="btn btn-primary" style="border-radius:8px;font-weight:600;">Submit Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RESULT SCREEN ════════════════════════════════= -->
+<div id="resultScreen" class="center-screen">
+  <div class="result-card">
+    <div class="score-circle" id="scoreCircle"></div>
+    <h2 style="font-family:'Space Grotesk',sans-serif;margin-bottom:6px;" id="resultTitle"></h2>
+    <p style="color:#64748b;font-size:.875rem;margin-bottom:16px;" id="resultDesc"></p>
+    <div id="malResult" style="display:none;background:#fef3c7;border-radius:10px;padding:12px;font-size:.82rem;color:#92400e;margin-bottom:16px;"></div>
+    <div style="background:#f8fafc;border-radius:10px;padding:14px;font-size:.875rem;color:#475569;margin-bottom:20px;">
+      Redirecting in <span id="countdown" style="font-weight:700;color:#2563eb;">5</span> seconds…
+    </div>
+    <a href="/dashboard" class="btn btn-primary" style="border-radius:10px;font-weight:600;width:100%;">Go to Dashboard Now</a>
+  </div>
+</div>
+
+<script>
+const EXAM_ID = {{ exam_id }};
+let examData=null, answers={}, currentQ=0;
+let timerInt=null, timeLeft=0;
+let tabSwitches=0, blurCount=0, copyPasteCount=0;
+let malWarned=false;
+let currentBatchId=null;
+let ws=null;
+
+// ══ MOBILE DETECTION ═════════════════════════════════
+function isMobile() {
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  const mobileRx = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile/i;
+  const smallScreen = window.innerWidth < 768 || window.screen.width < 768;
+  return mobileRx.test(ua.toLowerCase()) || smallScreen;
+}
+
+function checkDevice() {
+  if (isMobile()) {
+    document.getElementById('mobileBlock').style.display = 'flex';
+    // Hide all other screens
+    ['otpScreen','waitScreen','blockedScreen','examScreen','resultScreen']
+      .forEach(id => document.getElementById(id).style.display='none');
+    return false;
+  }
+  return true;
+}
+
+// ══ Malpractice listeners ════════════════════════════
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && document.getElementById('examScreen').style.display !== 'none') {
+    tabSwitches++;
+    triggerMal('tab_switch', tabSwitches);
+  }
+});
+window.addEventListener('blur', () => {
+  if (document.getElementById('examScreen').style.display !== 'none') {
+    blurCount++;
+    triggerMal('blur', blurCount);
+  }
+});
+['copy','paste','cut'].forEach(ev =>
+  document.addEventListener(ev, () => { copyPasteCount++; triggerMal('copy', copyPasteCount); }));
+document.addEventListener('contextmenu', e => {
+  if (document.getElementById('examScreen').style.display !== 'none') e.preventDefault();
+});
+document.addEventListener('keydown', e => {
+  if (document.getElementById('examScreen').style.display === 'none') return;
+  if ((e.ctrlKey||e.metaKey) && ['c','v','x','a','u'].includes(e.key.toLowerCase())) {
+    copyPasteCount++; triggerMal('copy', copyPasteCount);
+  }
+  if (e.key==='F12' || (e.ctrlKey&&e.shiftKey&&e.key==='I')) e.preventDefault();
+});
+
+function triggerMal(event, count) {
+  const thresholds = {tab_switch:3, blur:10, copy:5};
+  if (count >= (thresholds[event]||3) && !malWarned) {
+    document.getElementById('malBanner').style.display='block';
+    malWarned=true;
+  }
+  // Report to server (non-blocking)
+  if (count % 1 === 0) {
+    fetch(`/api/exams/${EXAM_ID}/malpractice-event`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token')},
+      body: JSON.stringify({event, count, batch_id: currentBatchId})
+    }).catch(()=>{});
+  }
+}
+
+// ══ WebSocket ════════════════════════════════════════
+function connectWS() {
+  const proto = location.protocol==='https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/exam/${EXAM_ID}`);
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type==='exam_started' && msg.exam_id===EXAM_ID) loadExam();
+    if (msg.type==='exam_ended' && msg.exam_id===EXAM_ID) submitExam();
+    if (msg.type==='batch_exam_started' && currentBatchId && msg.batch_id==currentBatchId) {
+      // Staff clicked "Start Exam" — move from wait screen to exam
+      startExamNow();
+    }
+  };
+  ws.onclose = () => setTimeout(connectWS, 3000);
+}
+
+// ══ Load Exam ════════════════════════════════════════
+async function loadExam() {
+  try {
+    const resp = await apiGet(`/api/exams/${EXAM_ID}/detail`);
+    if (resp.status===403) { const d=await resp.json(); showBlocked(d.detail); return; }
+    if (!resp.ok) { showBlocked('Exam not found.'); return; }
+    examData = await resp.json();
+  } catch(e) { showBlocked('Could not load exam.'); return; }
+
+  if (examData.status==='completed') { showBlocked('This exam has ended.'); return; }
+  if (examData.status==='draft') { showBlocked('Exam is not active yet.'); return; }
+  if (examData.status!=='active' && examData.status!=='scheduled') {
+    showBlocked('Exam is not currently available.'); return;
+  }
+  if (examData.otp_required) { showOtp(examData); return; }
+  startExamNow();
+}
+
+function showBlocked(msg) {
+  document.getElementById('blockedMsg').textContent = msg;
+  document.getElementById('blockedScreen').style.display='flex';
+}
+
+function showOtp(exam) {
+  document.getElementById('otpExamTitle').textContent = exam.title;
+  document.getElementById('otpExamDesc').textContent = exam.description || 'Ask your invigilator for the OTP.';
+  document.getElementById('otpScreen').style.display='flex';
+}
+
+async function verifyOtp() {
+  const otp = document.getElementById('otpInput').value.trim();
+  const err = document.getElementById('otpError');
+  const btn = document.getElementById('otpBtn');
+  err.style.display='none';
+  if (!otp || otp.length<4) { err.style.display='block'; err.textContent='Enter the OTP.'; return; }
+
+  btn.disabled=true; btn.textContent='Verifying…';
+
+  // Detect batch OTP: try matching against exam batches
+  // POST to verify-otp, the server will match against batch or exam OTP
+  try {
+    const resp = await fetch(`/api/exams/${EXAM_ID}/verify-otp`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token')},
+      body: JSON.stringify({otp})
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      err.style.display='block'; err.textContent = data.detail || 'Invalid OTP.';
+      btn.disabled=false; btn.innerHTML='<i class="fas fa-unlock me-2"></i>Enter Exam';
+      return;
+    }
+    if (data.wait_for_staff) {
+      // Batch mode — wait for staff to click Start
+      document.getElementById('otpScreen').style.display='none';
+      showWaitScreen();
+    } else {
+      startExamNow();
+    }
+  } catch(e) {
+    err.style.display='block'; err.textContent='Network error. Please retry.';
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-unlock me-2"></i>Enter Exam';
+  }
+}
+
+function showWaitScreen() {
+  document.getElementById('waitTitle').textContent = examData.title;
+  document.getElementById('waitDesc').textContent = 'Your OTP is verified. Waiting for your invigilator to start the exam for your batch.';
+  document.getElementById('waitScreen').style.display='flex';
+}
+
+function startExamNow() {
+  document.getElementById('otpScreen').style.display='none';
+  document.getElementById('waitScreen').style.display='none';
+  document.getElementById('blockedScreen').style.display='none';
+  timeLeft = examData.duration_minutes * 60;
+  document.getElementById('examScreen').style.display='flex';
+  document.getElementById('examHeaderTitle').textContent = examData.title;
+  renderQNav();
+  renderQuestion(0);
+  startTimer();
+}
+
+// ══ Render ═══════════════════════════════════════════
+function renderQNav() {
+  document.getElementById('qNav').innerHTML = examData.questions.map((q,i) =>
+    `<button class="q-btn ${i===currentQ?'current':answers[q.id]?'answered':''}"
+             onclick="renderQuestion(${i})" id="qbtn-${i}">${i+1}</button>`
+  ).join('');
+  updateSidebarStats();
+}
+
+function updateSidebarStats() {
+  const ans = Object.keys(answers).length;
+  const total = examData.questions.length;
+  document.getElementById('sidebarStats').innerHTML =
+    `Answered: <strong>${ans}/${total}</strong><br>Remaining: <strong>${total-ans}</strong>`;
+}
+
+function renderQuestion(idx) {
+  currentQ=idx;
+  document.querySelectorAll('.q-btn').forEach((b,i) => {
+    b.className=`q-btn ${i===idx?'current':answers[examData.questions[i].id]?'answered':''}`;
+  });
+  const q = examData.questions[idx];
+  let html=`<div class="q-card">
+    <div class="q-num">Question ${idx+1} of ${examData.questions.length} &nbsp;·&nbsp; ${q.marks} mark${q.marks>1?'s':''}</div>
+    <div class="q-text">${q.question_text}</div>`;
+
+  if (q.question_type==='mcq') {
+    ['A','B','C','D'].forEach((opt,i) => {
+      const texts=[q.option_a,q.option_b,q.option_c,q.option_d];
+      if (!texts[i]) return;
+      html+=`<div class="opt ${answers[q.id]===opt?'selected':''}" onclick="selectOpt(${q.id},'${opt}',this)">
+        <input type="radio" name="q${q.id}" value="${opt}" ${answers[q.id]===opt?'checked':''}> 
+        <span><strong>${opt}.</strong> ${texts[i]}</span></div>`;
+    });
+  } else if (q.question_type==='coding') {
+    html+=`<div id="monaco-${q.id}" style="height:300px;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;"></div>
+    <div class="mt-2 d-flex gap-2">
+      <select id="lang-${q.id}" class="form-select form-select-sm" style="width:120px;">
+        <option value="python">Python</option><option value="cpp">C++</option>
+        <option value="c">C</option><option value="java">Java</option>
+      </select>
+      <button onclick="runCode(${q.id})" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;"><i class="fas fa-play me-1"></i>Run</button>
+    </div>
+    <div id="out-${q.id}" style="display:none;font-size:.78rem;font-family:monospace;background:#1e293b;color:#e2e8f0;padding:10px;border-radius:8px;margin-top:8px;max-height:100px;overflow-y:auto;"></div>`;
+    if (q.test_cases?.length) {
+      html+=`<div class="mt-2" style="font-size:.78rem;color:#64748b;"><strong>Test cases:</strong> ${q.test_cases.length} visible`;
+      if (q.hidden_count) html+=` + ${q.hidden_count} hidden`;
+      html+='</div>';
+    }
+  }
+
+  html+=`<div class="nav-btns">
+    ${idx>0?`<button onclick="renderQuestion(${idx-1})" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;"><i class="fas fa-chevron-left me-1"></i>Prev</button>`:''}
+    ${idx<examData.questions.length-1
+      ?`<button onclick="renderQuestion(${idx+1})" class="btn btn-sm btn-primary" style="border-radius:8px;">Next<i class="fas fa-chevron-right ms-1"></i></button>`
+      :`<button onclick="openSubmitOverlay()" class="btn btn-sm btn-success" style="border-radius:8px;font-weight:600;"><i class="fas fa-paper-plane me-1"></i>Submit</button>`}
+  </div></div>`;
+  document.getElementById('qMain').innerHTML=html;
+  if (q.question_type==='coding') initMonaco(q);
+}
+
+const editors={};
+function initMonaco(q) {
+  setTimeout(()=>{
+    require.config({paths:{vs:'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs'}});
+    require(['vs/editor/editor.main'],()=>{
+      if (!document.getElementById(`monaco-${q.id}`)) return;
+      const ed = monaco.editor.create(document.getElementById(`monaco-${q.id}`),{
+        value:q.starter_code||'# Write your solution\n',language:'python',
+        theme:'vs-dark',minimap:{enabled:false},fontSize:13,
+        lineNumbers:'on',automaticLayout:true,scrollBeyondLastLine:false});
+      editors[q.id]=ed;
+      ed.onDidChangeModelContent(()=>{ answers[q.id]=ed.getValue(); });
+    });
+  },100);
+}
+
+async function runCode(qid) {
+  const ed=editors[qid]; if(!ed) return;
+  const code=ed.getValue(), lang=document.getElementById(`lang-${qid}`).value;
+  const out=document.getElementById(`out-${qid}`);
+  out.style.display='block'; out.textContent='Running…';
+  try {
+    const r=await apiPost('/api/compiler/run',{code,language:lang,stdin_input:''});
+    const d=await r.json();
+    out.textContent=d.stdout||d.stderr||'(no output)';
+    out.style.color=d.error?'#f87171':'#86efac';
+    answers[qid]=code;
+  } catch(e){ out.textContent='Error running code'; }
+}
+
+function selectOpt(qid,val,el) {
+  answers[qid]=val;
+  document.querySelectorAll(`[onclick^="selectOpt(${qid}"]`).forEach(r=>r.classList.remove('selected'));
+  el.classList.add('selected');
+  el.querySelector('input').checked=true;
+  const idx=examData.questions.findIndex(q=>q.id===qid);
+  if (idx!==currentQ) document.getElementById(`qbtn-${idx}`)?.classList.add('answered');
+  updateSidebarStats();
+}
+
+// ══ Timer ════════════════════════════════════════════
+function startTimer() {
+  timerInt=setInterval(()=>{
+    timeLeft--;
+    const el=document.getElementById('timer');
+    const h=Math.floor(timeLeft/3600),m=Math.floor((timeLeft%3600)/60),s=timeLeft%60;
+    el.textContent=h?`${p(h)}:${p(m)}:${p(s)}`:`${p(m)}:${p(s)}`;
+    if(timeLeft<=300){el.classList.add('warn');}
+    if(timeLeft<=60){el.classList.remove('warn');el.classList.add('danger');}
+    if(timeLeft<=0){clearInterval(timerInt);submitExam();}
+  },1000);
+}
+const p=n=>String(n).padStart(2,'0');
+
+// ══ Submit ═══════════════════════════════════════════
+function openSubmitOverlay() {
+  const ans=Object.keys(answers).length, total=examData.questions.length;
+  document.getElementById('submitSummary').textContent=`${ans} of ${total} answered. ${total-ans} unanswered.`;
+  const warn=document.getElementById('malWarn');
+  if (tabSwitches>=3||blurCount>=10||copyPasteCount>=5) {
+    warn.style.display='block';
+    warn.textContent=`⚠️ Activity: Tabs:${tabSwitches} Blur:${blurCount} Copy:${copyPasteCount}`;
+  }
+  document.getElementById('submitOverlay').style.display='flex';
+}
+function closeOverlay(){document.getElementById('submitOverlay').style.display='none';}
+
+async function submitExam() {
+  clearInterval(timerInt);
+  closeOverlay();
+  document.getElementById('examScreen').style.display='none';
+  try {
+    const resp=await apiPost(`/api/exams/${EXAM_ID}/submit`,{
+      answers, tab_switch_count:tabSwitches, blur_count:blurCount,
+      copy_paste_count:copyPasteCount, batch_id:currentBatchId});
+    const data=await resp.json();
+    showResult(data);
+  } catch(e) {
+    showResult({score:0,total_marks:0,passed:false,malpractice_flag:false});
+  }
+}
+
+function showResult(data) {
+  const pct=data.total_marks?Math.round(data.score/data.total_marks*100):0;
+  document.getElementById('resultScreen').style.display='flex';
+  const circle=document.getElementById('scoreCircle');
+  circle.style.background=data.passed?'#dcfce7':'#fee2e2';
+  circle.style.color=data.passed?'#16a34a':'#dc2626';
+  circle.textContent=`${pct}%`;
+  document.getElementById('resultTitle').textContent=data.passed?'🎉 You Passed!':'❌ Not Passed';
+  document.getElementById('resultDesc').textContent=`Score: ${data.score} / ${data.total_marks} marks`;
+  if (data.malpractice_flag) {
+    const mp=document.getElementById('malResult');
+    mp.style.display='block';
+    mp.textContent=`⚠️ Malpractice: ${data.malpractice_notes}`;
+  }
+  let c=5;
+  const iv=setInterval(()=>{
+    c--; document.getElementById('countdown').textContent=c;
+    if(c<=0){clearInterval(iv);window.location.href='/dashboard';}
+  },1000);
+}
+
+// ══ API helpers (fallback if app.js not loaded) ════════
+function apiGet(url){
+  return fetch(url,{headers:{'Authorization':'Bearer '+localStorage.getItem('token')}});
+}
+function apiPost(url,body){
+  return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token')},body:JSON.stringify(body)});
+}
+
+// ══ Init ═════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  if (!localStorage.getItem('token')) { window.location.href='/login'; return; }
+  if (!checkDevice()) return;   // Mobile block
+  connectWS();
+  loadExam();
+});
+</script>
+</body>
+</html>

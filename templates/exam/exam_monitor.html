@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% block title %}Live Exam Monitor{% endblock %}
+{% block page_title %}Live Exam Monitor{% endblock %}
+
+{% block content %}
+<div id="monitorContent">
+  <div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+</div>
+
+<!-- ═══ STUDENT FULLSCREEN MODAL ═══ -->
+<div class="modal fade" id="studentModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-fullscreen"><div class="modal-content" style="background:#0f172a;">
+    <div class="modal-header" style="background:#1e293b;border-bottom:1px solid #334155;">
+      <div class="d-flex align-items-center gap-3">
+        <h5 class="modal-title fw-bold text-white" id="sModalTitle">Student Monitor</h5>
+        <span id="sModalStatus" class="badge" style="font-size:.78rem;"></span>
+      </div>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body p-0">
+      <!-- Top stat bar -->
+      <div style="background:#1e293b;padding:12px 24px;display:flex;gap:24px;flex-wrap:wrap;border-bottom:1px solid #334155;">
+        <div id="sInfo" style="font-size:.82rem;color:#94a3b8;"></div>
+      </div>
+      <!-- Main content: activity feed + stats -->
+      <div class="row g-0" style="height:calc(100vh - 160px);">
+        <!-- Left: Live activity log -->
+        <div class="col-md-8" style="border-right:1px solid #1e293b;padding:20px;overflow-y:auto;">
+          <h6 style="color:#94a3b8;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">
+            <i class="fas fa-broadcast-tower me-2 text-green-400" style="color:#10b981;"></i>Live Activity Feed
+          </h6>
+          <div id="sActivityFeed" style="font-family:monospace;font-size:.82rem;"></div>
+        </div>
+        <!-- Right: Stats panel -->
+        <div class="col-md-4" style="padding:20px;overflow-y:auto;">
+          <h6 style="color:#94a3b8;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">
+            <i class="fas fa-chart-pie me-2" style="color:#6366f1;"></i>Exam Stats
+          </h6>
+          <div id="sStats"></div>
+          <hr style="border-color:#334155;margin:16px 0;">
+          <h6 style="color:#94a3b8;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">
+            <i class="fas fa-shield-alt me-2" style="color:#f59e0b;"></i>Integrity Monitor
+          </h6>
+          <div id="sIntegrity"></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<style>
+.student-card{border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;cursor:pointer;transition:all .2s;background:#fff;position:relative;}
+.student-card:hover{border-color:#2563eb;transform:translateY(-1px);box-shadow:0 4px 16px rgba(37,99,235,.12);}
+.student-card.waiting{border-color:#f59e0b;background:#fffbeb;}
+.student-card.present{border-color:#10b981;background:#f0fdf4;}
+.student-card.submitted{border-color:#6366f1;background:#eef2ff;}
+.student-card.absent{border-color:#e2e8f0;background:#f8fafc;opacity:.7;}
+.student-card.malpractice{border-color:#ef4444!important;background:#fef2f2!important;}
+.student-card.malpractice::after{content:'⚠️';position:absolute;top:8px;right:8px;font-size:1rem;animation:shake .5s infinite;}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-5deg)}75%{transform:rotate(5deg)}}
+.live-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.live-dot.green{background:#10b981;animation:blink 2s infinite;}
+.live-dot.yellow{background:#f59e0b;animation:blink 1s infinite;}
+.live-dot.red{background:#ef4444;animation:blink .5s infinite;}
+.live-dot.gray{background:#94a3b8;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.event-line{padding:5px 10px;border-radius:6px;margin-bottom:3px;font-size:.78rem;display:flex;align-items:flex-start;gap:8px;}
+.event-time{color:#64748b;min-width:70px;flex-shrink:0;}
+.ev-info{background:#eff6ff;color:#1d4ed8;}
+.ev-warn{background:#fef3c7;color:#92400e;}
+.ev-danger{background:#fee2e2;color:#dc2626;}
+.ev-success{background:#dcfce7;color:#166534;}
+.stat-box{background:#1e293b;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.stat-box .label{font-size:.75rem;color:#94a3b8;}
+.stat-box .value{font-size:1.2rem;font-weight:700;color:#f1f5f9;}
+.integrity-bar{margin-bottom:10px;}
+.integrity-bar .label{font-size:.75rem;color:#94a3b8;margin-bottom:3px;display:flex;justify-content:space-between;}
+.integrity-bar .bar{height:6px;border-radius:10px;background:#334155;overflow:hidden;}
+.integrity-bar .fill{height:100%;border-radius:10px;transition:width .5s;}
+.control-btn{border-radius:8px;font-size:.82rem;font-weight:600;padding:8px 16px;border:none;cursor:pointer;transition:all .2s;}
+.control-btn:hover{transform:translateY(-1px);}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const BATCH_ID = {{ batch_id }};
+let batchData = null;
+let studentEvents = {};  // studentId -> [{type, text, time}]
+let selectedStudentId = null;
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+// ─── WebSocket ────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/exam/0`);
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    handleWsMessage(msg);
+  };
+  ws.onclose = () => setTimeout(connectWS, 3000);
+}
+
+function handleWsMessage(msg) {
+  if (msg.batch_id && msg.batch_id != BATCH_ID) return;
+
+  if (msg.type === 'student_otp_entered') {
+    addStudentEvent(msg.student_id, 'info', `📋 Entered OTP — waiting to start`);
+    refreshBatch();
+  } else if (msg.type === 'batch_exam_started') {
+    addGlobalEvent('info', '🟢 Exam started for this batch');
+    refreshBatch();
+  } else if (msg.type === 'exam_submitted') {
+    if (msg.exam_id == (batchData?.exam_id)) {
+      addStudentEvent(msg.student_id, 'success',
+        `✅ Submitted — Score: ${msg.score}/${msg.total_marks || '?'} | ${msg.passed ? 'PASS' : 'FAIL'}`);
+      if (msg.malpractice) addStudentEvent(msg.student_id, 'danger', `⚠️ Malpractice flagged on submission`);
+      refreshBatch();
+    }
+  } else if (msg.type === 'malpractice_event') {
+    const evMap = {tab_switch:'Tab Switch', blur:'Window Blur', copy:'Copy/Paste'};
+    addStudentEvent(msg.student_id, 'danger',
+      `🚨 ${evMap[msg.event] || msg.event} detected — count: ${msg.count}`);
+    // If this student is open in modal, update live
+    if (selectedStudentId === msg.student_id) updateStudentModal(msg.student_id);
+    refreshBatch();
+  }
+}
+
+// ─── Per-student event log ─────────────────────────────────────
+function addStudentEvent(studentId, type, text) {
+  if (!studentEvents[studentId]) studentEvents[studentId] = [];
+  studentEvents[studentId].unshift({type, text, time: new Date().toLocaleTimeString('en-IN')});
+  if (studentEvents[studentId].length > 100) studentEvents[studentId].pop();
+}
+function addGlobalEvent(type, text) {
+  batchData?.members?.forEach(m => addStudentEvent(m.student_id, type, text));
+}
+
+// ─── Load & Render Batch ──────────────────────────────────────
+async function refreshBatch() {
+  const resp = await apiGet(`/api/exams/batches/${BATCH_ID}`);
+  if (!resp.ok) return;
+  batchData = await resp.json();
+  renderMonitor();
+}
+
+function renderMonitor() {
+  const b = batchData;
+  const absent = b.total - b.otp_entered_count;
+
+  document.getElementById('monitorContent').innerHTML = `
+  <!-- Top control panel -->
+  <div class="card-custom p-4 mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+      <div>
+        <h4 style="font-weight:700;margin-bottom:4px;">${b.batch_name}</h4>
+        <div style="font-size:.85rem;color:#64748b;">
+          <i class="fas fa-user-tie me-1"></i>Invigilator: <strong>${b.staff_name}</strong>
+          &nbsp;·&nbsp; Exam ID: <strong>${b.exam_id}</strong>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="live-dot ${b.exam_enabled?'green':b.otp_active?'yellow':'gray'}"></div>
+        <span style="font-size:.8rem;color:#475569;font-weight:500;">
+          ${b.exam_enabled ? 'Exam Running' : b.otp_active ? 'OTP Active — Waiting' : 'Not Started'}
+        </span>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="row g-2 mb-3">
+      ${[
+        {label:'Total Students', val:b.total,              bg:'#f1f5f9', fg:'#0f172a'},
+        {label:'OTP Entered',    val:b.otp_entered_count,  bg:'#fef9c3', fg:'#854d0e'},
+        {label:'Absent / Late',  val:absent,               bg:'#fee2e2', fg:'#dc2626'},
+        {label:'Present',        val:b.present_count,      bg:'#dcfce7', fg:'#16a34a'},
+        {label:'Submitted',      val:b.submitted_count,    bg:'#eef2ff', fg:'#4338ca'},
+        {label:'🚨 Malpractice', val:b.malpractice_count,  bg:b.malpractice_count?'#fee2e2':'#f1f5f9', fg:b.malpractice_count?'#dc2626':'#94a3b8'},
+      ].map(s => `<div class="col-6 col-md-2">
+        <div style="background:${s.bg};border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:1.6rem;font-weight:700;color:${s.fg};">${s.val}</div>
+          <div style="font-size:.68rem;color:${s.fg};opacity:.8;">${s.label}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Control buttons -->
+    <div class="d-flex gap-2 flex-wrap">
+      ${!b.otp_active ? `
+        <button onclick="activateOTP()" class="control-btn" style="background:#f59e0b;color:#fff;">
+          <i class="fas fa-key me-1"></i>Reveal OTP to Students
+        </button>` : `
+        <div style="background:#0f172a;color:#fff;padding:8px 20px;border-radius:8px;font-family:monospace;font-size:1.6rem;letter-spacing:.4em;font-weight:700;display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-key" style="font-size:.9rem;color:#f59e0b;"></i>${b.otp}
+        </div>
+        <button onclick="regenOTP()" class="control-btn" style="background:#f1f5f9;color:#475569;" title="Regenerate OTP">
+          <i class="fas fa-sync me-1"></i>New OTP
+        </button>`}
+      ${b.otp_active && !b.exam_enabled ? `
+        <button onclick="startBatchExam()" class="control-btn" style="background:#10b981;color:#fff;">
+          <i class="fas fa-play me-1"></i>Start Exam for All Ready Students
+        </button>` : ''}
+      ${b.exam_enabled ? `
+        <button class="control-btn" style="background:#dcfce7;color:#16a34a;cursor:default;">
+          <i class="fas fa-check me-1"></i>Exam Running
+        </button>` : ''}
+      <a href="/exams/${b.exam_id}/submissions" target="_blank" class="control-btn" style="background:#eef2ff;color:#4338ca;text-decoration:none;">
+        <i class="fas fa-table me-1"></i>Full Results
+      </a>
+      <a href="/exams/${b.exam_id}/batches" class="control-btn" style="background:#f1f5f9;color:#475569;text-decoration:none;">
+        <i class="fas fa-arrow-left me-1"></i>All Batches
+      </a>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="d-flex gap-3 mb-3 flex-wrap" style="font-size:.75rem;color:#64748b;">
+    <span><span style="display:inline-block;width:12px;height:12px;background:#fef9c3;border:1.5px solid #f59e0b;border-radius:3px;margin-right:4px;"></span>Waiting (OTP done)</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#f0fdf4;border:1.5px solid #10b981;border-radius:3px;margin-right:4px;"></span>Present (in exam)</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#eef2ff;border:1.5px solid #6366f1;border-radius:3px;margin-right:4px;"></span>Submitted</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#fef2f2;border:1.5px solid #ef4444;border-radius:3px;margin-right:4px;"></span>Malpractice ⚠️</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:3px;margin-right:4px;"></span>Absent</span>
+    <span style="margin-left:auto;font-style:italic;">Click any student card to see full detail</span>
+  </div>
+
+  <!-- Student grid -->
+  <div class="row g-2">
+    ${b.members.map(m => renderStudentCard(m)).join('')}
+  </div>`;
+}
+
+function renderStudentCard(m) {
+  let cls = 'student-card absent';
+  let statusIcon = '⏸';
+  let statusText = 'Absent';
+  let statusStyle = 'color:#94a3b8;';
+
+  if (m.malpractice) {
+    cls = 'student-card malpractice';
+    statusIcon = '⚠️'; statusText = 'MALPRACTICE'; statusStyle = 'color:#dc2626;font-weight:700;';
+  } else if (m.submitted) {
+    cls = 'student-card submitted';
+    statusIcon = '✅'; statusText = `${m.score ?? '?'} marks · ${m.passed ? 'PASS' : 'FAIL'}`;
+    statusStyle = `color:${m.passed ? '#4338ca' : '#dc2626'};font-weight:600;`;
+  } else if (m.is_present) {
+    cls = 'student-card present';
+    statusIcon = '🟢'; statusText = 'Taking Exam'; statusStyle = 'color:#16a34a;font-weight:600;';
+  } else if (m.otp_entered) {
+    cls = 'student-card waiting';
+    statusIcon = '⏳'; statusText = 'Waiting for start'; statusStyle = 'color:#854d0e;';
+  }
+
+  const evCount = (studentEvents[m.student_id] || []).filter(e => e.type === 'danger').length;
+
+  return `<div class="col-sm-6 col-md-4 col-lg-3">
+    <div class="${cls}" onclick="openStudentModal(${m.student_id})">
+      <div class="d-flex align-items-start justify-content-between mb-1">
+        <div>
+          <div style="font-weight:600;font-size:.85rem;color:#0f172a;">${m.name}</div>
+          <div style="font-size:.7rem;color:#64748b;">${m.roll_number || ''}</div>
+          <div style="font-size:.7rem;color:#94a3b8;">${m.department || ''}</div>
+        </div>
+        <div style="font-size:1.1rem;">${statusIcon}</div>
+      </div>
+      <div style="font-size:.72rem;${statusStyle}">${statusText}</div>
+      ${evCount > 0 ? `<div style="font-size:.68rem;color:#dc2626;margin-top:4px;">
+        <i class="fas fa-exclamation-triangle me-1"></i>${evCount} alert${evCount>1?'s':''}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+// ─── Student fullscreen modal ─────────────────────────────────
+function openStudentModal(studentId) {
+  selectedStudentId = studentId;
+  updateStudentModal(studentId);
+  new bootstrap.Modal(document.getElementById('studentModal')).show();
+}
+
+function updateStudentModal(studentId) {
+  const b = batchData;
+  if (!b) return;
+  const m = b.members.find(x => x.student_id === studentId);
+  if (!m) return;
+
+  const events = studentEvents[studentId] || [];
+  const malEvents = events.filter(e => e.type === 'danger');
+
+  // Status badge
+  let badgeBg = '#94a3b8', badgeText = 'Absent';
+  if (m.malpractice) { badgeBg='#ef4444'; badgeText='⚠️ MALPRACTICE'; }
+  else if (m.submitted) { badgeBg=m.passed?'#6366f1':'#dc2626'; badgeText=m.passed?'✅ PASSED':'❌ FAILED'; }
+  else if (m.is_present) { badgeBg='#10b981'; badgeText='🟢 IN EXAM'; }
+  else if (m.otp_entered) { badgeBg='#f59e0b'; badgeText='⏳ WAITING'; }
+
+  document.getElementById('sModalTitle').textContent = `${m.name} — ${m.roll_number || m.email}`;
+  document.getElementById('sModalStatus').style.background = badgeBg;
+  document.getElementById('sModalStatus').style.color = '#fff';
+  document.getElementById('sModalStatus').textContent = badgeText;
+
+  document.getElementById('sInfo').innerHTML = `
+    <span><i class="fas fa-id-card me-1"></i>${m.roll_number || '—'}</span>
+    <span class="ms-3"><i class="fas fa-building me-1"></i>${m.department || '—'}</span>
+    <span class="ms-3"><i class="fas fa-envelope me-1"></i>${m.email}</span>
+    ${m.submitted ? `<span class="ms-3"><i class="fas fa-chart-bar me-1"></i>Score: <strong style="color:#f1f5f9;">${m.score ?? '?'} marks</strong></span>` : ''}`;
+
+  // Activity feed
+  document.getElementById('sActivityFeed').innerHTML = events.length
+    ? events.map(ev => `<div class="event-line ev-${ev.type}">
+        <span class="event-time">${ev.time}</span>
+        <span>${ev.text}</span>
+      </div>`).join('')
+    : `<div style="color:#475569;font-size:.82rem;padding:20px;text-align:center;">
+        No activity recorded yet for this student.
+        <br><small style="color:#334155;">Events will appear here in real time.</small>
+      </div>`;
+
+  // Stats
+  document.getElementById('sStats').innerHTML = `
+    <div class="stat-box"><span class="label">OTP Entered</span><span class="value">${m.otp_entered ? '✅ Yes' : '❌ No'}</span></div>
+    <div class="stat-box"><span class="label">Exam Started</span><span class="value">${m.is_present ? '✅ Yes' : '❌ No'}</span></div>
+    <div class="stat-box"><span class="label">Submitted</span><span class="value">${m.submitted ? '✅ Yes' : '❌ No'}</span></div>
+    ${m.submitted ? `
+    <div class="stat-box"><span class="label">Score</span><span class="value" style="color:${m.passed?'#4ade80':'#f87171'};">${m.score ?? '?'} marks</span></div>
+    <div class="stat-box"><span class="label">Result</span><span class="value" style="color:${m.passed?'#4ade80':'#f87171'};">${m.passed ? 'PASS' : 'FAIL'}</span></div>` : ''}`;
+
+  // Integrity bars
+  const tabPct  = Math.min(100, (m.tab_switches / 3) * 100);
+  const blurPct = Math.min(100, (m.blur_count  / 10) * 100);
+  const copyPct = Math.min(100, (m.copy_paste  / 5)  * 100);
+  const barColor = pct => pct >= 100 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#10b981';
+
+  document.getElementById('sIntegrity').innerHTML = `
+    ${integrityBar('Tab Switches', m.tab_switches, 3, tabPct, barColor(tabPct))}
+    ${integrityBar('Window Blur',  m.blur_count,  10, blurPct, barColor(blurPct))}
+    ${integrityBar('Copy/Paste',   m.copy_paste,   5, copyPct, barColor(copyPct))}
+    <div style="margin-top:12px;padding:10px;border-radius:8px;background:${m.malpractice?'#450a0a':'#052e16'};border:1px solid ${m.malpractice?'#ef4444':'#166534'};">
+      <div style="font-size:.78rem;font-weight:700;color:${m.malpractice?'#f87171':'#4ade80'};">
+        ${m.malpractice ? '⚠️ MALPRACTICE FLAGGED' : '🛡️ Integrity: Clean'}
+      </div>
+      ${m.malpractice ? `<div style="font-size:.72rem;color:#fca5a5;margin-top:4px;">${malEvents.length} suspicious event${malEvents.length!==1?'s':''} detected</div>` : ''}
+    </div>`;
+}
+
+function integrityBar(label, val, threshold, pct, color) {
+  return `<div class="integrity-bar">
+    <div class="label">
+      <span>${label}</span>
+      <span style="color:${color};font-weight:600;">${val} / ${threshold}</span>
+    </div>
+    <div class="bar"><div class="fill" style="width:${pct}%;background:${color};"></div></div>
+  </div>`;
+}
+
+// ─── Controls ─────────────────────────────────────────────────
+async function activateOTP() {
+  const resp = await apiPost(`/api/exams/batches/${BATCH_ID}/activate-otp`, {});
+  if (resp.ok) { showToast('✅ OTP activated! Display to students.', 'success'); refreshBatch(); }
+  else showToast('Error activating OTP', 'error');
+}
+
+async function regenOTP() {
+  if (!confirm('Regenerate OTP? Students who already entered will need to re-enter.')) return;
+  const resp = await apiPost(`/api/exams/batches/${BATCH_ID}/regenerate-otp`, {});
+  const d = await resp.json();
+  if (resp.ok) { showToast(`New OTP: ${d.otp}`, 'success'); refreshBatch(); }
+}
+
+async function startBatchExam() {
+  const ready = batchData?.otp_entered_count || 0;
+  if (!confirm(`Start exam for ${ready} student(s) who entered OTP?`)) return;
+  const resp = await apiPost(`/api/exams/batches/${BATCH_ID}/start-exam`, {});
+  if (resp.ok) { showToast('🟢 Exam started for batch!', 'success'); refreshBatch(); }
+  else showToast('Error starting exam', 'error');
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  refreshBatch();
+  connectWS();
+  setInterval(refreshBatch, 10000); // auto-refresh every 10s
+});
+</script>
+{% endblock %}

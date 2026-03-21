@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Left: Notification Feed -->
+  <div class="col-md-8">
+    <div class="card-custom">
+
+      <!-- Header -->
+      <div class="d-flex align-items-center justify-content-between p-4 pb-3" style="border-bottom:1px solid #f1f5f9;">
+        <div class="d-flex align-items-center gap-3">
+          <h5 style="font-weight:700;margin:0;">Notifications</h5>
+          <span id="unreadBadge" style="display:none;background:#ef4444;color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;"></span>
+        </div>
+        <div class="d-flex gap-2">
+          <button onclick="filterNotifs('all',this)" class="tab-pill active" id="pill-all">All</button>
+          <button onclick="filterNotifs('unread',this)" class="tab-pill" id="pill-unread">Unread</button>
+          <button onclick="markAllRead()" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:.78rem;">
+            <i class="fas fa-check-double me-1"></i>Mark all read
+          </button>
+        </div>
+      </div>
+
+      <!-- Role hint banner -->
+      <div id="roleBanner" style="display:none;background:#eff6ff;border-bottom:1px solid #dbeafe;padding:8px 20px;font-size:.78rem;color:#1d4ed8;">
+        <i class="fas fa-info-circle me-1"></i>
+        <span id="roleBannerText"></span>
+      </div>
+
+      <!-- Notification list -->
+      <div id="notifList" style="min-height:200px;">
+        <div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Right: Send Notification + Legend -->
+  <div class="col-md-4">
+
+    <!-- Send panel — shown only for staff/company/head -->
+    <div class="card-custom p-4 mb-3" id="sendPanel" style="display:none;">
+      <h6 style="font-weight:700;margin-bottom:14px;">
+        <i class="fas fa-paper-plane me-2" style="color:#2563eb;"></i>Send Notification
+      </h6>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold" style="font-size:.82rem;">Who to send to *</label>
+        <select class="form-select form-select-sm" id="s_type" onchange="onTypeChange()">
+          <!-- Options injected by JS based on role -->
+        </select>
+      </div>
+
+      <div class="mb-3" id="driveSelectWrap" style="display:none;">
+        <label class="form-label fw-semibold" style="font-size:.82rem;">Related Drive (optional)</label>
+        <select class="form-select form-select-sm" id="s_drive">
+          <option value="">— None —</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold" style="font-size:.82rem;">Title *</label>
+        <input type="text" class="form-control form-control-sm" id="s_title" placeholder="Notification title">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold" style="font-size:.82rem;">Message *</label>
+        <textarea class="form-control form-control-sm" id="s_msg" rows="4" placeholder="Write your message…"></textarea>
+      </div>
+
+      <button onclick="sendNotif()" class="btn btn-primary btn-sm w-100" style="border-radius:8px;font-weight:600;">
+        <i class="fas fa-paper-plane me-1"></i>Send
+      </button>
+    </div>
+
+    <!-- Notification type legend -->
+    <div class="card-custom p-4">
+      <h6 style="font-weight:700;margin-bottom:12px;font-size:.85rem;">Notification Types</h6>
+      <div id="legendBox"></div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+.tab-pill{background:transparent;border:0.5px solid #e2e8f0;border-radius:20px;padding:4px 14px;font-size:.78rem;font-weight:500;color:#64748b;cursor:pointer;transition:all .15s;}
+.tab-pill.active{background:#2563eb;border-color:#2563eb;color:#fff;}
+.notif-item{display:flex;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid #f8fafc;cursor:pointer;transition:background .12s;}
+.notif-item:hover{background:#fafbff;}
+.notif-item.unread{background:#fafbff;}
+.notif-item:last-child{border-bottom:none;}
+.notif-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem;}
+.notif-title{font-weight:600;font-size:.875rem;color:#1e293b;margin-bottom:3px;}
+.notif-title.read{font-weight:500;color:#475569;}
+.notif-msg{font-size:.8rem;color:#64748b;line-height:1.5;margin-bottom:5px;}
+.notif-meta{font-size:.72rem;color:#94a3b8;display:flex;align-items:center;gap:10px;}
+.notif-dot{width:8px;height:8px;background:#ef4444;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.legend-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid #f1f5f9;font-size:.8rem;}
+.legend-row:last-child{border-bottom:none;}
+.legend-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+.empty-state{text-align:center;padding:40px 20px;color:#94a3b8;}
+</style>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const TYPE_META = {
+  company_to_students:  {label:'Company → Students',       icon:'fa-building',    bg:'#eff6ff',  color:'#2563eb',  desc:'Announcements from companies to students'},
+  head_to_staff:        {label:'Head → Staff / Officers',  icon:'fa-user-shield', bg:'#f5f3ff',  color:'#7c3aed',  desc:'Messages from Head Admin to placement team'},
+  company_to_placement: {label:'Company → Placement Cell', icon:'fa-handshake',   bg:'#fef3c7',  color:'#d97706',  desc:'Companies communicating with placement office'},
+  system:               {label:'System / General',         icon:'fa-bell',        bg:'#f1f5f9',  color:'#475569',  desc:'Portal announcements and updates'},
+};
+
+// Send-panel options per role
+const SEND_OPTIONS = {
+  head_admin: [
+    {value:'head_to_staff|staff',              label:'→ All Staff'},
+    {value:'head_to_staff|placement_officer',  label:'→ Placement Officers'},
+    {value:'head_to_staff|senior_staff',       label:'→ Senior Staff'},
+    {value:'system|',                          label:'→ Everyone (broadcast)'},
+    {value:'company_to_students|student',      label:'→ All Students'},
+  ],
+  placement_officer: [
+    {value:'head_to_staff|staff',              label:'→ Staff Team'},
+    {value:'system|',                          label:'→ Everyone (broadcast)'},
+    {value:'company_to_students|student',      label:'→ Students'},
+  ],
+  senior_staff: [
+    {value:'head_to_staff|staff',              label:'→ Staff Team'},
+    {value:'company_to_students|student',      label:'→ Students'},
+  ],
+  staff: [
+    {value:'company_to_students|student',      label:'→ Students'},
+  ],
+  junior_staff: [
+    {value:'company_to_students|student',      label:'→ Students'},
+  ],
+  company_hr_manager: [
+    {value:'company_to_students|student',           label:'→ Students'},
+    {value:'company_to_placement|placement_officer', label:'→ Placement Officer'},
+  ],
+  company_tech_interviewer: [
+    {value:'company_to_students|student',      label:'→ Students'},
+    {value:'company_to_placement|placement_officer', label:'→ Placement Officer'},
+  ],
+  company_recruitment_mgr: [
+    {value:'company_to_students|student',      label:'→ Students'},
+    {value:'company_to_placement|placement_officer', label:'→ Placement Officer'},
+  ],
+  company_team_leader: [
+    {value:'company_to_students|student',      label:'→ Students'},
+    {value:'company_to_placement|placement_officer', label:'→ Placement Officer'},
+  ],
+  company_officer: [
+    {value:'company_to_students|student',      label:'→ Students'},
+    {value:'company_to_placement|placement_officer', label:'→ Placement Officer'},
+  ],
+  company: [
+    {value:'company_to_students|student',      label:'→ Students'},
+    {value:'company_to_placement|placement_officer', label:'→ Placement Officer'},
+  ],
+};
+
+const ROLE_BANNERS = {
+  student:               'You see announcements from companies and college-wide broadcasts.',
+  placement_officer:     'You see messages from companies and head admin communications.',
+  head_admin:            'You see all notifications across the portal.',
+  senior_staff:          'You see messages from head admin and staff-level communications.',
+  staff:                 'You see messages from head admin and staff-level communications.',
+  junior_staff:          'You see messages from head admin and staff-level communications.',
+  company_hr_manager:    'You see notifications you sent and system broadcasts.',
+  company_tech_interviewer:'You see notifications you sent and system broadcasts.',
+  company_recruitment_mgr:'You see notifications you sent and system broadcasts.',
+  company_team_leader:   'You see notifications you sent and system broadcasts.',
+  company_officer:       'You see notifications you sent and system broadcasts.',
+  company:               'You see notifications you sent and system broadcasts.',
+};
+
+let allNotifs = [];
+let currentFilter = 'all';
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+const role = user.role || 'student';
+
+async function init() {
+  // Role banner
+  const banner = document.getElementById('roleBanner');
+  const bannerText = document.getElementById('roleBannerText');
+  if (ROLE_BANNERS[role]) {
+    banner.style.display = 'block';
+    bannerText.textContent = ROLE_BANNERS[role];
+  }
+
+  // Send panel
+  const sendPanel = document.getElementById('sendPanel');
+  const opts = SEND_OPTIONS[role];
+  if (opts && opts.length) {
+    sendPanel.style.display = 'block';
+    const sel = document.getElementById('s_type');
+    sel.innerHTML = opts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    onTypeChange();
+    loadDrivesForSend();
+  }
+
+  // Legend
+  buildLegend(role);
+
+  // Load notifications
+  await loadNotifs();
+}
+
+function buildLegend(role) {
+  const visibleTypes = {
+    student:              ['company_to_students', 'system'],
+    placement_officer:    ['company_to_placement', 'head_to_staff', 'system'],
+    head_admin:           ['company_to_students', 'head_to_staff', 'company_to_placement', 'system'],
+    senior_staff:         ['head_to_staff', 'system'],
+    staff:                ['head_to_staff', 'system'],
+    junior_staff:         ['head_to_staff', 'system'],
+    company_hr_manager:   ['company_to_students', 'company_to_placement', 'system'],
+    company_tech_interviewer:['company_to_students','company_to_placement','system'],
+    company_recruitment_mgr:['company_to_students','company_to_placement','system'],
+    company_team_leader:  ['company_to_students', 'company_to_placement', 'system'],
+    company_officer:      ['company_to_students', 'company_to_placement', 'system'],
+    company:              ['company_to_students', 'company_to_placement', 'system'],
+  };
+  const types = visibleTypes[role] || Object.keys(TYPE_META);
+  document.getElementById('legendBox').innerHTML = types.map(t => {
+    const m = TYPE_META[t];
+    return `<div class="legend-row">
+      <div class="legend-icon" style="background:${m.bg};color:${m.color};"><i class="fas ${m.icon}"></i></div>
+      <div>
+        <div style="font-weight:600;font-size:.78rem;color:#1e293b;">${m.label}</div>
+        <div style="font-size:.72rem;color:#94a3b8;">${m.desc}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadNotifs() {
+  try {
+    const resp = await apiGet('/api/campus-drive/notifications/mine');
+    if (!resp.ok) { showError('Failed to load notifications'); return; }
+    allNotifs = await resp.json();
+  } catch(e) { showError('Network error'); return; }
+
+  updateBadge();
+  renderNotifs();
+}
+
+function updateBadge() {
+  const unread = allNotifs.filter(n => !n.is_read).length;
+  const badge = document.getElementById('unreadBadge');
+  const pill = document.getElementById('pill-unread');
+  if (unread > 0) {
+    badge.style.display = 'inline';
+    badge.textContent = unread + ' new';
+    pill.textContent = `Unread (${unread})`;
+  } else {
+    badge.style.display = 'none';
+    pill.textContent = 'Unread';
+  }
+}
+
+function filterNotifs(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.tab-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderNotifs();
+}
+
+function renderNotifs() {
+  const list = document.getElementById('notifList');
+  let notifs = allNotifs;
+  if (currentFilter === 'unread') notifs = notifs.filter(n => !n.is_read);
+
+  if (!notifs.length) {
+    list.innerHTML = `<div class="empty-state">
+      <i class="fas fa-inbox fa-3x mb-3" style="color:#e2e8f0;"></i>
+      <p style="font-weight:500;color:#94a3b8;">${currentFilter === 'unread' ? 'All caught up! No unread notifications.' : 'No notifications yet.'}</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = notifs.map(n => {
+    const m = TYPE_META[n.notif_type] || TYPE_META.system;
+    const timeAgo = relTime(n.created_at);
+    const roleLabel = SENDER_ROLE_LABEL[n.sender_role] || n.sender_role || '';
+    return `<div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markRead(${n.id}, this)">
+      <div class="notif-icon" style="background:${m.bg};color:${m.color};">
+        <i class="fas ${m.icon}"></i>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="notif-title ${n.is_read ? 'read' : ''}">${escHtml(n.title)}</div>
+          ${!n.is_read ? '<span class="notif-dot"></span>' : ''}
+        </div>
+        <div class="notif-msg">${escHtml(n.message)}</div>
+        <div class="notif-meta">
+          <span style="background:${m.bg};color:${m.color};padding:1px 7px;border-radius:10px;font-size:.69rem;font-weight:600;">${m.label}</span>
+          <span><i class="fas fa-user me-1"></i>${escHtml(n.sender_name)}${roleLabel ? ` · ${roleLabel}` : ''}</span>
+          <span><i class="fas fa-clock me-1"></i>${timeAgo}</span>
+          ${n.drive_id ? `<a href="/campus-drives/${n.drive_id}" onclick="event.stopPropagation()" style="color:#2563eb;font-size:.72rem;"><i class="fas fa-external-link-alt me-1"></i>View Drive</a>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+const SENDER_ROLE_LABEL = {
+  head_admin:'Head Admin', placement_officer:'Placement Officer',
+  senior_staff:'Senior Staff', staff:'Staff', junior_staff:'Junior Staff',
+  company_hr_manager:'HR Manager', company_tech_interviewer:'Tech Interviewer',
+  company_recruitment_mgr:'Recruitment Mgr', company_team_leader:'Team Leader',
+  company_officer:'Company Officer', company:'Company', student:'Student',
+};
+
+async function markRead(id, el) {
+  await apiPost(`/api/campus-drive/notifications/${id}/read`, {});
+  const n = allNotifs.find(x => x.id === id);
+  if (n) n.is_read = true;
+  el.classList.remove('unread');
+  el.querySelector('.notif-dot')?.remove();
+  el.querySelector('.notif-title')?.classList.add('read');
+  updateBadge();
+}
+
+async function markAllRead() {
+  await apiPost('/api/campus-drive/notifications/read-all', {});
+  allNotifs.forEach(n => n.is_read = true);
+  updateBadge();
+  renderNotifs();
+  showToast('All notifications marked as read', 'success');
+}
+
+// ── Send panel ──────────────────────────────────────
+
+async function loadDrivesForSend() {
+  if (!['company_hr_manager','company_tech_interviewer','company_recruitment_mgr',
+        'company_team_leader','company_officer','company'].includes(role)) return;
+  try {
+    const resp = await apiGet('/api/campus-drive/drives');
+    const drives = await resp.json();
+    const sel = document.getElementById('s_drive');
+    drives.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.title;
+      sel.appendChild(opt);
+    });
+  } catch(e) {}
+}
+
+function onTypeChange() {
+  const val = document.getElementById('s_type').value;
+  const [notifType] = val.split('|');
+  const showDrive = notifType === 'company_to_students' || notifType === 'company_to_placement';
+  document.getElementById('driveSelectWrap').style.display = showDrive ? 'block' : 'none';
+}
+
+async function sendNotif() {
+  const val = document.getElementById('s_type').value;
+  const [notifType, targetRole] = val.split('|');
+  const title = document.getElementById('s_title').value.trim();
+  const message = document.getElementById('s_msg').value.trim();
+  const driveId = document.getElementById('s_drive')?.value || '';
+
+  if (!title || !message) { showToast('Title and message are required', 'error'); return; }
+
+  const body = { notif_type: notifType, target_role: targetRole || null, title, message };
+
+  let endpoint = '/api/campus-drive/notify/general';
+  if (driveId) endpoint = `/api/campus-drive/drives/${driveId}/notify`;
+
+  const resp = await apiPost(endpoint, body);
+  const data = await resp.json();
+  if (resp.ok) {
+    showToast('Notification sent!', 'success');
+    document.getElementById('s_title').value = '';
+    document.getElementById('s_msg').value = '';
+    await loadNotifs();
+  } else {
+    showToast(data.detail || 'Failed to send', 'error');
+  }
+}
+
+// ── Utilities ──────────────────────────────────────
+
+function relTime(iso) {
+  if (!iso) return '';
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+  return new Date(iso).toLocaleDateString('en-IN', {day:'numeric', month:'short'});
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showError(msg) {
+  document.getElementById('notifList').innerHTML =
+    `<div class="empty-state"><i class="fas fa-exclamation-circle fa-2x mb-3" style="color:#ef4444;"></i><p style="color:#ef4444;">${msg}</p></div>`;
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

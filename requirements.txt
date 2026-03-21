@@ -1,0 +1,58 @@
+<<<<<<< HEAD
+# ================================================================
+# University Placement Portal v2.3 — requirements.txt
+# Works on: Windows (local dev) + Linux (Render/Docker production)
+#
+# uvloop + httptools are Linux-only — excluded here
+# The Dockerfile installs them separately on Linux
+# ================================================================
+
+# ── Web framework ───────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+starlette==0.37.2
+python-multipart==0.0.9
+
+# ── Pydantic v2 — PINNED (prebuilt wheel for Python 3.11) ──────
+pydantic==2.7.1
+pydantic-core==2.18.2
+email-validator==2.1.1
+
+# ── Database ────────────────────────────────────────────────────
+sqlalchemy==2.0.30
+PyMySQL==1.1.1
+cryptography==42.0.8
+
+# ── Redis ───────────────────────────────────────────────────────
+redis==5.0.4
+
+# ── Auth ────────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.3
+
+# ── Templates & files ───────────────────────────────────────────
+jinja2==3.1.4
+aiofiles==23.2.1
+
+# ── Utilities ───────────────────────────────────────────────────
+python-dotenv==1.0.1
+websockets==12.0
+anyio==4.3.0
+
+# NOTE: uvloop and httptools are Linux-only (used in Dockerfile for Render)
+# DO NOT add them here — they will break on Windows
+=======
+fastapi>=0.110.0
+uvicorn[standard]>=0.30.0
+sqlalchemy>=2.0.30
+pydantic>=2.8.0
+email-validator>=2.1.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.9
+jinja2>=3.1.4
+aiofiles>=23.2.1
+pymysql>=1.1.0
+cryptography>=42.0.0
+>>>>>>> af4f32748063e99991af38a663e1b62643a31674

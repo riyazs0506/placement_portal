@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Placement Results{% endblock %}
+{% block page_title %}Placement Results{% endblock %}
+
+{% block content %}
+<div id="resultsContent">
+  <div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+const role = user.role || 'student';
+const STATUS_META = {
+  selected:    {bg:'#dcfce7',color:'#16a34a',icon:'fa-check-circle',label:'Selected'},
+  shortlisted: {bg:'#fef9c3',color:'#854d0e',icon:'fa-star',        label:'Shortlisted'},
+  on_hold:     {bg:'#dbeafe',color:'#1d4ed8',icon:'fa-pause-circle', label:'On Hold'},
+  rejected:    {bg:'#fee2e2',color:'#dc2626',icon:'fa-times-circle', label:'Not Selected'},
+};
+
+async function load() {
+  const div = document.getElementById('resultsContent');
+  try {
+    if (role === 'student') {
+      const r = await apiGet('/api/campus-drive/placement-results/mine');
+      const results = await r.json();
+      if (!results.length) {
+        div.innerHTML = `<div class="card-custom p-5 text-center">
+          <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">No placement results yet</h5>
+          <p class="text-muted">Opt in to campus drives and participate in rounds to appear here.</p>
+          <a href="/campus-drives" class="btn btn-primary" style="border-radius:10px;">Browse Drives</a>
+        </div>`; return;
+      }
+      div.innerHTML = `
+        <div class="row g-3">
+          ${results.map(r => {
+            const m = STATUS_META[r.status] || STATUS_META.shortlisted;
+            return `<div class="col-md-6">
+              <div class="card-custom p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                  <div>
+                    <h6 style="font-weight:700;margin-bottom:3px;">${r.drive_title}</h6>
+                    <div style="font-size:.8rem;color:#7c3aed;font-weight:600;">${r.company}</div>
+                  </div>
+                  <span style="background:${m.bg};color:${m.color};padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:700;">
+                    <i class="fas ${m.icon} me-1"></i>${m.label}
+                  </span>
+                </div>
+                ${r.offer_role ? `<div style="font-size:.82rem;color:#374151;"><i class="fas fa-briefcase me-1 text-primary"></i><strong>Role:</strong> ${r.offer_role}</div>` : ''}
+                ${r.offer_package_lpa ? `<div style="font-size:.82rem;color:#374151;margin-top:3px;"><i class="fas fa-rupee-sign me-1 text-success"></i><strong>Package:</strong> ${r.offer_package_lpa} LPA</div>` : ''}
+                ${r.joining_date ? `<div style="font-size:.82rem;color:#374151;margin-top:3px;"><i class="fas fa-calendar me-1 text-warning"></i><strong>Joining:</strong> ${r.joining_date}</div>` : ''}
+                ${r.has_offer_letter && r.status === 'selected' ? `
+                  <button onclick="apiDownload(`/api/campus-drive/drives/${r.drive_id}/offer-letter/${user.id}`,this)" class="btn btn-success btn-sm mt-3 w-100" style="border-radius:8px;"><i class="fas fa-download me-1"></i>Download Offer Letter</button>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    } else {
+      // Staff/company: show all drives and their results
+      const dr = await apiGet('/api/campus-drive/drives');
+      const drives = await dr.json();
+      const completedDrives = drives.filter(d => ['approved','ongoing','completed'].includes(d.status));
+      if (!completedDrives.length) {
+        div.innerHTML = '<div class="card-custom p-5 text-center"><p class="text-muted">No drives with results yet.</p></div>';
+        return;
+      }
+      div.innerHTML = `<div class="row g-3">${completedDrives.map(d => `
+        <div class="col-12">
+          <div class="card-custom p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 style="font-weight:700;margin:0;">${d.title}</h6>
+              <a href="/campus-drives/${d.id}" class="btn btn-sm btn-outline-primary" style="border-radius:8px;">View Drive</a>
+            </div>
+            <div id="pr-${d.id}"><div class="text-muted" style="font-size:.83rem;">Loading results…</div></div>
+          </div>
+        </div>`).join('')}</div>`;
+      for (const d of completedDrives) {
+        try {
+          const pr = await apiGet(`/api/campus-drive/drives/${d.id}/placement-results`);
+          const results = await pr.json();
+          const cell = document.getElementById(`pr-${d.id}`);
+          if (!results.length) { cell.innerHTML = '<p class="text-muted" style="font-size:.83rem;">No placement results recorded yet.</p>'; continue; }
+          cell.innerHTML = `<div style="overflow-x:auto;"><table class="table table-sm" style="font-size:.8rem;">
+            <thead><tr><th>Name</th><th>Dept</th><th>Roll No</th><th>Status</th><th>Role</th><th>Package</th><th>Action</th></tr></thead>
+            <tbody>${results.map(r => {
+              const m = STATUS_META[r.status] || STATUS_META.shortlisted;
+              return `<tr>
+                <td><div style="font-weight:500;">${r.name}</div><div style="font-size:.72rem;color:#64748b;">${r.email}</div></td>
+                <td>${r.department||'-'}</td>
+                <td>${r.roll_number||'-'}</td>
+                <td><span style="background:${m.bg};color:${m.color};padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;">${m.label}</span></td>
+                <td>${r.offer_role||'-'}</td>
+                <td>${r.offer_package_lpa ? r.offer_package_lpa+' LPA' : '-'}</td>
+                <td>${r.has_offer_letter ? `<button onclick="apiDownload(\`/api/campus-drive/drives/${d.id}/offer-letter/${r.student_id}\`,this)" class="btn btn-xs btn-success" style="font-size:.72rem;padding:2px 8px;border-radius:6px;border:none;cursor:pointer;">⬇ Letter</button>` : '-'}</td>
+              </tr>`;
+            }).join('')}</tbody></table></div>`;
+        } catch(e) {}
+      }
+    }
+  } catch(e) { div.innerHTML = '<div class="alert alert-danger">Failed to load placement results.</div>'; }
+}
+
+document.addEventListener('DOMContentLoaded', load);
+</script>
+{% endblock %}

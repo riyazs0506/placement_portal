@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div id="dashContent">
+  <!-- Stats row -->
+  <div class="row g-3 mb-4" id="statsRow">
+    <div class="col-12 text-center py-4"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>
+  </div>
+
+  <!-- Real-time activity bar -->
+  <div id="rtBar" style="display:none;background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:12px;padding:12px 18px;margin-bottom:16px;color:#fff;font-size:.83rem;display:flex;align-items:center;gap:10px;">
+    <span style="width:8px;height:8px;background:#10b981;border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0;"></span>
+    <span id="rtMsg">Live updates active</span>
+  </div>
+
+  <div class="row g-3">
+    <!-- Main content -->
+    <div class="col-md-8">
+      <!-- Student: New eligible drives (disappear once opted) -->
+      <div id="newDrivesSection" style="display:none;margin-bottom:16px;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 style="font-weight:700;margin:0;color:#0f172a;">
+            <i class="fas fa-building me-2 text-primary"></i>New Campus Drives for You
+          </h6>
+          <a href="/campus-drives" style="font-size:.78rem;color:#2563eb;text-decoration:none;">View all drives</a>
+        </div>
+        <div id="newDrivesList"></div>
+      </div>
+
+      <!-- Activity -->
+      <div class="card-custom p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 style="font-weight:700;margin:0;" id="activityTitle">Recent Activity</h6>
+          <span id="activityBadge" style="display:none;background:#eff6ff;color:#2563eb;font-size:.72rem;padding:2px 8px;border-radius:10px;font-weight:600;"></span>
+        </div>
+        <div id="activityList"><div class="text-center py-3"><i class="fas fa-spinner fa-spin text-muted"></i></div></div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+      <!-- Placement results for student -->
+      <div id="placementSection" class="card-custom p-4 mb-3" style="display:none;">
+        <h6 style="font-weight:700;margin-bottom:12px;"><i class="fas fa-trophy me-2" style="color:#f59e0b;"></i>My Placement Status</h6>
+        <div id="placementList"></div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card-custom p-4">
+        <h6 style="font-weight:700;margin-bottom:12px;">Quick Actions</h6>
+        <div id="quickActions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.drive-mini{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:8px;transition:border .2s;}
+.drive-mini:hover{border-color:#93c5fd;}
+.action-link{display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;text-decoration:none;color:#1e293b;margin-bottom:6px;transition:all .2s;font-size:.85rem;font-weight:500;}
+.action-link:hover{background:#eff6ff;border-color:#93c5fd;color:#1e293b;}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const QUICK_ACTIONS = {
+  student:               [{label:'Take Exam',icon:'fa-pencil-alt',href:'/exams',c:'#2563eb'},{label:'Campus Drives',icon:'fa-building',href:'/campus-drives',c:'#7c3aed'},{label:'Notifications',icon:'fa-bell',href:'/notifications',c:'#f59e0b'},{label:'My Results',icon:'fa-trophy',href:'/placement-results',c:'#10b981'}],
+  head_admin:            [{label:'Create Exam',icon:'fa-plus',href:'/exams/create',c:'#2563eb'},{label:'Question Bank',icon:'fa-database',href:'/questions',c:'#7c3aed'},{label:'Campus Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'},{label:'Analytics',icon:'fa-chart-bar',href:'/analytics',c:'#f59e0b'}],
+  placement_officer:     [{label:'Campus Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'},{label:'Notifications',icon:'fa-bell',href:'/notifications',c:'#f59e0b'},{label:'Analytics',icon:'fa-chart-bar',href:'/analytics',c:'#2563eb'}],
+  senior_staff:          [{label:'Create Exam',icon:'fa-plus',href:'/exams/create',c:'#2563eb'},{label:'Question Bank',icon:'fa-database',href:'/questions',c:'#7c3aed'},{label:'Campus Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'}],
+  staff:                 [{label:'Create Exam',icon:'fa-plus',href:'/exams/create',c:'#2563eb'},{label:'Question Bank',icon:'fa-database',href:'/questions',c:'#7c3aed'},{label:'Campus Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'}],
+  junior_staff:          [{label:'View Exams',icon:'fa-pencil-alt',href:'/exams',c:'#2563eb'},{label:'Campus Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'}],
+  company_hr_manager:    [{label:'New Drive',icon:'fa-plus',href:'/campus-drives/create',c:'#7c3aed'},{label:'My Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'},{label:'Notifications',icon:'fa-bell',href:'/notifications',c:'#f59e0b'}],
+  company_tech_interviewer:[{label:'My Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'},{label:'Notifications',icon:'fa-bell',href:'/notifications',c:'#f59e0b'}],
+  company_recruitment_mgr:[{label:'New Drive',icon:'fa-plus',href:'/campus-drives/create',c:'#7c3aed'},{label:'My Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'}],
+  company_team_leader:   [{label:'My Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'},{label:'Notifications',icon:'fa-bell',href:'/notifications',c:'#f59e0b'}],
+  company_officer:       [{label:'New Drive',icon:'fa-plus',href:'/campus-drives/create',c:'#7c3aed'},{label:'My Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'}],
+  company:               [{label:'New Drive',icon:'fa-plus',href:'/campus-drives/create',c:'#7c3aed'},{label:'My Drives',icon:'fa-building',href:'/campus-drives',c:'#10b981'}],
+};
+
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+const role = user.role || 'student';
+
+async function loadDashboard() {
+  // Quick actions
+  const actions = QUICK_ACTIONS[role] || QUICK_ACTIONS.student;
+  document.getElementById('quickActions').innerHTML = actions.map(a =>
+    `<a href="${a.href}" class="action-link">
+       <div style="width:32px;height:32px;background:${a.c}15;border-radius:8px;display:flex;align-items:center;justify-content:center;color:${a.c};font-size:.85rem;flex-shrink:0;"><i class="fas ${a.icon}"></i></div>
+       ${a.label}
+       <i class="fas fa-chevron-right ms-auto" style="color:#cbd5e1;font-size:.65rem;"></i>
+     </a>`).join('');
+
+  // Stats
+  try {
+    const r = await apiGet('/api/dashboard/stats');
+    if (r.ok) renderStats(await r.json());
+  } catch(e) {}
+
+  // Role-specific sections
+  if (role === 'student') {
+    loadStudentDrives();
+    loadPlacementStatus();
+    loadStudentActivity();
+  } else {
+    loadStaffActivity();
+  }
+
+  // WebSocket for real-time
+  connectRealtime();
+}
+
+async function loadStudentDrives() {
+  try {
+    const r = await apiGet('/api/campus-drive/drives/dashboard-preview');
+    if (!r.ok) return;
+    const drives = await r.json();
+    if (!drives.length) return;
+    const sec = document.getElementById('newDrivesSection');
+    const list = document.getElementById('newDrivesList');
+    sec.style.display = 'block';
+    list.innerHTML = drives.map(d => `
+      <div class="drive-mini">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div style="font-weight:600;font-size:.875rem;">${d.title}</div>
+            <div style="font-size:.75rem;color:#7c3aed;font-weight:600;">${d.job_role}</div>
+            <div style="font-size:.73rem;color:#64748b;margin-top:2px;">
+              ${d.company_name} ${d.package_lpa ? '· ₹'+d.package_lpa+' LPA' : ''} ${d.location ? '· '+d.location : ''}
+            </div>
+          </div>
+          <a href="/campus-drives/${d.id}" class="btn btn-sm btn-primary" style="border-radius:7px;font-size:.75rem;padding:4px 10px;flex-shrink:0;">View</a>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function loadPlacementStatus() {
+  try {
+    const r = await apiGet('/api/placement/stats/student');
+    if (!r.ok) return;
+    const s = await r.json();
+    if (!s.drives_applied) return;
+    const sec = document.getElementById('placementSection');
+    sec.style.display = 'block';
+    sec.querySelector('#placementList').innerHTML = `
+      <div class="row g-2" style="font-size:.8rem;">
+        <div class="col-6"><div style="background:#f8fafc;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1.2rem;font-weight:700;color:#2563eb;">${s.drives_opted}</div><div style="color:#64748b;">Applied</div></div></div>
+        <div class="col-6"><div style="background:#f8fafc;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1.2rem;font-weight:700;color:#10b981;">${s.selected}</div><div style="color:#64748b;">Selected</div></div></div>
+        <div class="col-6"><div style="background:#f8fafc;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1.2rem;font-weight:700;color:#f59e0b;">${s.shortlisted}</div><div style="color:#64748b;">Shortlisted</div></div></div>
+        <div class="col-6"><div style="background:#f8fafc;border-radius:8px;padding:8px;text-align:center;"><div style="font-size:1.2rem;font-weight:700;color:#7c3aed;">${s.offer_letters_available}</div><div style="color:#64748b;">Offer Letters</div></div></div>
+      </div>
+      ${s.offer_letters_available ? `<a href="/placement-results" class="btn btn-sm btn-success w-100 mt-2" style="border-radius:8px;font-size:.78rem;"><i class="fas fa-download me-1"></i>Download Offer Letters</a>` : ''}`;
+  } catch(e) {}
+}
+
+async function loadStudentActivity() {
+  const div = document.getElementById('activityList');
+  document.getElementById('activityTitle').textContent = 'Your Exams';
+  try {
+    const r = await apiGet('/api/exams/all');
+    const exams = await r.json();
+    if (!exams.length) { div.innerHTML = '<p class="text-muted text-center py-3" style="font-size:.85rem;">No active exams right now.</p>'; return; }
+    div.innerHTML = exams.slice(0,5).map(e => `
+      <div class="d-flex align-items-center gap-3 p-3 mb-2 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+        <div style="width:34px;height:34px;background:#2563eb15;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#2563eb;font-size:.85rem;flex-shrink:0;"><i class="fas fa-pencil-alt"></i></div>
+        <div style="flex:1;">
+          <div style="font-weight:600;font-size:.87rem;">${e.title}</div>
+          <div style="font-size:.73rem;color:#64748b;">${e.duration_minutes} min · ${e.question_count} Qs · ${e.total_marks} marks</div>
+        </div>
+        ${e.already_submitted
+          ? `<span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:3px 8px;border-radius:8px;font-weight:600;">Score: ${e.submission_score}</span>`
+          : e.status === 'active'
+            ? `<a href="/exams/${e.id}" class="btn btn-sm btn-primary" style="border-radius:7px;font-size:.75rem;">Start</a>`
+            : `<span style="font-size:.72rem;background:#f1f5f9;color:#475569;padding:3px 8px;border-radius:8px;">${e.status}</span>`}
+      </div>`).join('');
+  } catch(e) { div.innerHTML = '<p class="text-muted text-center py-3">Could not load exams.</p>'; }
+}
+
+async function loadStaffActivity() {
+  const div = document.getElementById('activityList');
+  document.getElementById('activityTitle').textContent = 'Recent Exams';
+  try {
+    const r = await apiGet('/api/exams/all');
+    const exams = await r.json();
+    div.innerHTML = exams.slice(0,6).map(e => {
+      const sc = {active:'#dcfce7:#16a34a', draft:'#f1f5f9:#475569', completed:'#f3f4f6:#6b7280', scheduled:'#dbeafe:#1d4ed8'};
+      const [bg,fg] = (sc[e.status]||'#f1f5f9:#475569').split(':');
+      return `<div class="d-flex align-items-center gap-3 p-3 mb-2 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+        <div style="flex:1;"><div style="font-weight:600;font-size:.87rem;">${e.title}</div><div style="font-size:.73rem;color:#64748b;">${e.question_count} Qs · ${e.exam_type} · ${e.submission_count} submissions</div></div>
+        <span style="background:${bg};color:${fg};padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600;">${e.status}</span>
+      </div>`;
+    }).join('') || '<p class="text-muted text-center py-3">No exams yet.</p>';
+  } catch(e) {}
+}
+
+function renderStats(s) {
+  const isStudent = role === 'student';
+  const cards = isStudent ? [
+    {label:'Exams Taken', value:s.exams_taken??0, icon:'fa-pencil-alt', c:'#2563eb'},
+    {label:'Exams Passed', value:s.exams_passed??0, icon:'fa-check-circle', c:'#10b981'},
+    {label:'Avg Score', value:(s.avg_score??0)+'%', icon:'fa-chart-line', c:'#f59e0b'},
+    {label:'Drives Opted', value:s.drives_opted??0, icon:'fa-building', c:'#7c3aed'},
+  ] : [
+    {label:'Total Students', value:s.total_students??0, icon:'fa-users', c:'#2563eb'},
+    {label:'Total Exams', value:s.total_exams??0, icon:'fa-pencil-alt', c:'#7c3aed'},
+    {label:'Campus Drives', value:s.total_drives??0, icon:'fa-building', c:'#10b981'},
+    {label:'Pass Rate', value:(s.pass_rate??0)+'%', icon:'fa-chart-pie', c:'#f59e0b'},
+  ];
+  document.getElementById('statsRow').innerHTML = cards.map(c => `
+    <div class="col-6 col-md-3">
+      <div class="stat-card d-flex align-items-center gap-3">
+        <div style="width:44px;height:44px;background:${c.c}15;border-radius:12px;display:flex;align-items:center;justify-content:center;color:${c.c};font-size:1.1rem;flex-shrink:0;"><i class="fas ${c.icon}"></i></div>
+        <div><div style="font-size:1.4rem;font-weight:700;color:#0f172a;">${c.value}</div><div style="font-size:.73rem;color:#64748b;">${c.label}</div></div>
+      </div>
+    </div>`).join('');
+}
+
+function connectRealtime() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/notifications/${user.id || 0}`);
+  const rtBar = document.getElementById('rtBar');
+  const rtMsg = document.getElementById('rtMsg');
+  ws.onopen = () => { rtBar.style.display = 'flex'; };
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'drive_approved') {
+      rtMsg.textContent = `🎉 New campus drive approved: ${msg.title}`;
+      if (role === 'student') loadStudentDrives();
+      showToast(`New drive open: ${msg.title}`, 'info');
+    } else if (msg.type === 'exam_started') {
+      rtMsg.textContent = `📝 Exam started: ${msg.title}`;
+      showToast(`Exam is now live: ${msg.title}`, 'info');
+      if (role === 'student') loadStudentActivity();
+    } else if (msg.type === 'optin_update') {
+      if (['head_admin','placement_officer','senior_staff','staff'].includes(role)) {
+        rtMsg.textContent = `Student opt-in update for drive #${msg.drive_id}`;
+      }
+    } else if (msg.type === 'placement_result') {
+      if (role === 'student' && msg.student_id === user.id) {
+        rtMsg.textContent = `🎉 You have a new placement update!`;
+        loadPlacementStatus();
+        showToast('You have a new placement update!', 'success');
+      }
+    }
+  };
+  ws.onclose = () => { rtBar.style.display = 'none'; };
+}
+
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

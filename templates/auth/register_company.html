@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Registration – Placement Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Inter',sans-serif;background:#0f172a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;}
+        body::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(124,58,237,.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(6,182,212,.1) 0%,transparent 60%);}
+        .wrap{position:relative;z-index:10;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:24px;backdrop-filter:blur(20px);box-shadow:0 32px 64px rgba(0,0,0,.5);width:560px;max-width:100%;padding:36px;}
+        .brand{text-align:center;margin-bottom:24px;}
+        .brand-icon{width:52px;height:52px;background:linear-gradient(135deg,#7c3aed,#06b6d4);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px;}
+        h1{font-family:'Space Grotesk',sans-serif;color:#fff;font-size:1.4rem;font-weight:700;}
+        .sub{color:rgba(255,255,255,.4);font-size:.83rem;margin-top:4px;}
+        .warn-banner{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);border-radius:10px;padding:10px 14px;color:#c4b5fd;font-size:.82rem;margin-bottom:20px;display:flex;align-items:flex-start;gap:8px;}
+        .form-label{color:rgba(255,255,255,.7);font-size:.82rem;font-weight:500;margin-bottom:5px;}
+        .form-control,.form-select{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;padding:10px 13px;font-size:.88rem;transition:border .2s;width:100%;}
+        .form-control:focus,.form-select:focus{background:rgba(255,255,255,.1);border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.15);color:#fff;outline:none;}
+        .form-control::placeholder{color:rgba(255,255,255,.25);}
+        .form-select option{background:#1e293b;color:#fff;}
+        .key-field{position:relative;}
+        .key-field .toggle-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:.9rem;}
+        .btn-reg{width:100%;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;border:none;border-radius:10px;padding:12px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .2s;margin-top:8px;}
+        .btn-reg:hover{opacity:.9;transform:translateY(-1px);}
+        .alert-box{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:10px;color:#fca5a5;padding:10px 14px;font-size:.82rem;margin-bottom:14px;display:none;}
+        .login-link{text-align:center;margin-top:14px;color:rgba(255,255,255,.4);font-size:.82rem;}
+        .login-link a{color:#a78bfa;text-decoration:none;}
+        .row{display:flex;gap:14px;flex-wrap:wrap;} .col{flex:1;min-width:200px;}
+        .mb-3{margin-bottom:14px;}
+        .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+        .role-card{background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px;}
+        .role-card:hover{background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.4);}
+        .role-card.selected{background:rgba(124,58,237,.2);border-color:#7c3aed;}
+        .role-card input{display:none;}
+        .role-label{font-size:.82rem;color:rgba(255,255,255,.8);font-weight:500;}
+        .role-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="brand">
+        <div class="brand-icon"><i class="fas fa-building text-white" style="font-size:20px;"></i></div>
+        <h1>Company Registration</h1>
+        <p class="sub">HR Managers, Interviewers, Recruiters &amp; more</p>
+    </div>
+    <div class="warn-banner"><i class="fas fa-key mt-1"></i><span>A <strong>company secret key</strong> is required. Contact the placement cell to obtain it.</span></div>
+    <div class="alert-box" id="alertBox"></div>
+
+    <div class="row">
+        <div class="col">
+            <div class="mb-3">
+                <label class="form-label">Full Name *</label>
+                <input type="text" class="form-control" id="name" placeholder="Your name">
+            </div>
+        </div>
+        <div class="col">
+            <div class="mb-3">
+                <label class="form-label">Email *</label>
+                <input type="email" class="form-control" id="email" placeholder="hr@company.com">
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <div class="mb-3">
+                <label class="form-label">Password *</label>
+                <input type="password" class="form-control" id="password" placeholder="Min 6 chars">
+            </div>
+        </div>
+        <div class="col">
+            <div class="mb-3">
+                <label class="form-label">Company Name *</label>
+                <input type="text" class="form-control" id="company_name" placeholder="e.g. Infosys Ltd">
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Your Role at Company *</label>
+        <div class="role-grid" id="roleGrid">
+            <div class="role-card" onclick="selectRole('company_hr_manager',this)">
+                <div class="role-icon" style="background:rgba(16,185,129,.2);color:#34d399;"><i class="fas fa-user-tie"></i></div>
+                <span class="role-label">HR Manager</span>
+            </div>
+            <div class="role-card" onclick="selectRole('company_tech_interviewer',this)">
+                <div class="role-icon" style="background:rgba(37,99,235,.2);color:#60a5fa;"><i class="fas fa-laptop-code"></i></div>
+                <span class="role-label">Technical Interviewer</span>
+            </div>
+            <div class="role-card" onclick="selectRole('company_recruitment_mgr',this)">
+                <div class="role-icon" style="background:rgba(245,158,11,.2);color:#fcd34d;"><i class="fas fa-users-cog"></i></div>
+                <span class="role-label">Recruitment Manager</span>
+            </div>
+            <div class="role-card" onclick="selectRole('company_team_leader',this)">
+                <div class="role-icon" style="background:rgba(124,58,237,.2);color:#a78bfa;"><i class="fas fa-sitemap"></i></div>
+                <span class="role-label">Team Leader</span>
+            </div>
+            <div class="role-card" onclick="selectRole('company_officer',this)">
+                <div class="role-icon" style="background:rgba(6,182,212,.2);color:#67e8f9;"><i class="fas fa-briefcase"></i></div>
+                <span class="role-label">Company Officer</span>
+            </div>
+            <div class="role-card" onclick="selectRole('company',this)">
+                <div class="role-icon" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);"><i class="fas fa-building"></i></div>
+                <span class="role-label">General / Other</span>
+            </div>
+        </div>
+        <input type="hidden" id="selectedRole" value="">
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Designation / Job Title</label>
+        <input type="text" class="form-control" id="designation" placeholder="e.g. Senior HR Manager">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Company Secret Key *</label>
+        <div class="key-field">
+            <input type="password" class="form-control" id="secret_key" placeholder="Enter the company secret key">
+            <button class="toggle-eye" onclick="toggleKey()"><i class="fas fa-eye" id="eyeIcon"></i></button>
+        </div>
+    </div>
+
+    <button class="btn-reg" onclick="doRegister()" id="regBtn">
+        <span id="regText"><i class="fas fa-building me-2"></i>Register Company Account</span>
+        <span id="regSpinner" style="display:none;"><i class="fas fa-spinner fa-spin"></i> Verifying…</span>
+    </button>
+    <div class="login-link">Already registered? <a href="/login">Sign in</a> &nbsp;|&nbsp; <a href="/register">Student registration</a></div>
+</div>
+
+<script>
+let selectedRole = '';
+function selectRole(role, el) {
+    document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedRole = role;
+}
+function toggleKey() {
+    const f = document.getElementById('secret_key');
+    f.type = f.type === 'password' ? 'text' : 'password';
+    document.getElementById('eyeIcon').className = f.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+}
+async function doRegister() {
+    const alertBox = document.getElementById('alertBox');
+    alertBox.style.display = 'none';
+    if (!selectedRole) {
+        alertBox.textContent = 'Please select your role at the company.';
+        alertBox.style.display = 'block'; return;
+    }
+    const body = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        role: selectedRole,
+        secret_key: document.getElementById('secret_key').value,
+        company_name: document.getElementById('company_name').value.trim(),
+        company_designation: document.getElementById('designation').value.trim() || null,
+    };
+    if (!body.name || !body.email || !body.password || !body.company_name || !body.secret_key) {
+        alertBox.textContent = 'All required fields must be filled.';
+        alertBox.style.display = 'block'; return;
+    }
+    document.getElementById('regText').style.display = 'none';
+    document.getElementById('regSpinner').style.display = 'inline';
+    document.getElementById('regBtn').disabled = true;
+    try {
+        const resp = await fetch('/api/users/register', {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            alertBox.textContent = data.detail || 'Registration failed. Check your secret key.';
+            alertBox.style.display = 'block';
+        } else {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            window.location.href = '/dashboard';
+        }
+    } catch(e) {
+        alertBox.textContent = 'Network error.'; alertBox.style.display = 'block';
+    } finally {
+        document.getElementById('regText').style.display = 'inline';
+        document.getElementById('regSpinner').style.display = 'none';
+        document.getElementById('regBtn').disabled = false;
+    }
+}
+</script>
+</body>
+</html>

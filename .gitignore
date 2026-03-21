@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Database — never commit the local DB
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.production
+
+# Uploads
+uploads/
+*.pdf
+*.docx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage

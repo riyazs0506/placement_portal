@@ -1,0 +1,35 @@
+# ================================================================
+# render.yaml — University Placement Portal (FINAL FIXED)
+# ================================================================
+services:
+  - type: web
+    name: placement-portal
+    env: docker
+    dockerfilePath: ./Dockerfile
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: STAFF_SECRET_KEY
+        sync: false
+      - key: OFFICER_SECRET_KEY
+        sync: false
+      - key: ADMIN_SECRET_KEY
+        sync: false
+      - key: COMPANY_SECRET_KEY
+        sync: false
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
